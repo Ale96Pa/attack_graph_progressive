@@ -1,18 +1,50 @@
 import json
 
-### Benchmark parameters
-num_cores = 3 ### !!! ALERT !!! corresponds to the number of used cores
-num_experiments = 1
-sampling_method = "random_walk"
-num_samples = 50
+### BENCHMARK parameters
+# num_cores = 3 ### !!! ALERT !!! corresponds to the number of used cores
+# num_experiments = 1
 
+### SAMPLING parameters
+sampling_algorithm = "random_walk" #bfs,dfs,random_walk
+num_samples = 10
+
+
+### NETWORK SETTING parameters
+nhosts = [10]
+nvulns = [5]
+topologies = ["mesh"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
+distro = ["uniform"] #uniform,bernoulli,poisson,binomial
+diversity = [0.5] #0,0.25,0.5,0.75,1
+
+### NETWORK FILES parameters
 ROOT_FOLDER = "dataset/"
 stat_folder = "stats/"
 plot_folder = "plot/"
 samples_folder = "samples/"
 gt_folder = "ground_truth/"
-gt_paths = "/ground_truth/GT_paths.json"
-gt_base = "/ground_truth/base_gt.csv"
+gt_paths = gt_folder+"GT_paths.json"
+gt_base = gt_folder+"base_gt.csv"
+
+# ### sampling settings
+# def get_paths_file(ind, isSteering): 
+#     if isSteering=="naive": return "/samples/npaths_"+str(ind)+".json"
+#     elif isSteering=="embedded": return "/samples/epaths_"+str(ind)+".json"
+#     else: return "/samples/paths_"+str(ind)+".json"
+# def get_query_paths_file(ind, isSteering): 
+#     if isSteering=="naive": return "/samples/nQpaths_"+str(ind)+".json"
+#     elif isSteering=="embedded": return "/samples/eQpaths_"+str(ind)+".json"
+#     else: return "/samples/Qpaths_"+str(ind)+".json"
+
+# ### base features settings
+# def get_base_stats_file(ind): return "/stats/base_stats_"+str(ind)+".csv"
+# def get_base_sample_file(ind): return "/stats/base_samples_"+str(ind)+".csv"
+
+# ### derivative features settings
+# def get_derivative_sample(ind): return "/stats/derivative_samples_"+str(ind)+".csv"
+# def get_derivative_gt(ind): return "/stats/derivative_gt_"+str(ind)+".csv"
+
+# ## steering performance setting
+# def get_steering_stats(ind): return "/stats/steering_performance_"+str(ind)+".csv" 
 
 ### Inventories
 cpe_file = "inventory/services.json"
@@ -35,24 +67,3 @@ def get_pool_vulnerabilities(tot_vuln):
             vulns2 = json.load(f2)["vulnerabilities"]
             vulns3 = json.load(f3)["vulnerabilities"]
             return vulns1+vulns2+vulns3
-
-# ### sampling settings
-# def get_paths_file(ind, isSteering): 
-#     if isSteering=="naive": return "/samples/npaths_"+str(ind)+".json"
-#     elif isSteering=="embedded": return "/samples/epaths_"+str(ind)+".json"
-#     else: return "/samples/paths_"+str(ind)+".json"
-# def get_query_paths_file(ind, isSteering): 
-#     if isSteering=="naive": return "/samples/nQpaths_"+str(ind)+".json"
-#     elif isSteering=="embedded": return "/samples/eQpaths_"+str(ind)+".json"
-#     else: return "/samples/Qpaths_"+str(ind)+".json"
-
-# ### base features settings
-# def get_base_stats_file(ind): return "/stats/base_stats_"+str(ind)+".csv"
-# def get_base_sample_file(ind): return "/stats/base_samples_"+str(ind)+".csv"
-
-# ### derivative features settings
-# def get_derivative_sample(ind): return "/stats/derivative_samples_"+str(ind)+".csv"
-# def get_derivative_gt(ind): return "/stats/derivative_gt_"+str(ind)+".csv"
-
-# ## steering performance setting
-# def get_steering_stats(ind): return "/stats/steering_performance_"+str(ind)+".csv" 
