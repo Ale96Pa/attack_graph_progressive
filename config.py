@@ -1,31 +1,32 @@
 import json
 
 ### BENCHMARK parameters
-# num_cores = 3 ### !!! ALERT !!! corresponds to the number of used cores
-# num_experiments = 1
+num_cores = 1
 
 ### SAMPLING parameters
-sampling_algorithm = "random_walk" #bfs,dfs,random_walk
-num_samples = 10
+sampling_algorithms = ["random_walk"]#,"bfs","dfs"]
+num_samples = 5
+collision_control = 5 #number of tuples to consider for average collisions
 
 
 ### NETWORK SETTING parameters
 nhosts = [10]
 nvulns = [5]
-topologies = ["mesh"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
+topologies = ["random"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
 distro = ["uniform"] #uniform,bernoulli,poisson,binomial
 diversity = [0.5] #0,0.25,0.5,0.75,1
+num_experiments = 1
 
 ### NETWORK FILES parameters
 ROOT_FOLDER = "dataset/"
 stat_folder = "stats/"
 plot_folder = "plot/"
-samples_folder = "samples/"
+samples_folder = "/samples/"
 gt_folder = "ground_truth/"
 gt_paths = gt_folder+"GT_paths.json"
 gt_base = gt_folder+"base_gt.csv"
 
-# ### sampling settings
+### SAMPLING settings
 # def get_paths_file(ind, isSteering): 
 #     if isSteering=="naive": return "/samples/npaths_"+str(ind)+".json"
 #     elif isSteering=="embedded": return "/samples/epaths_"+str(ind)+".json"
@@ -34,6 +35,10 @@ gt_base = gt_folder+"base_gt.csv"
 #     if isSteering=="naive": return "/samples/nQpaths_"+str(ind)+".json"
 #     elif isSteering=="embedded": return "/samples/eQpaths_"+str(ind)+".json"
 #     else: return "/samples/Qpaths_"+str(ind)+".json"
+def get_query_samples_filename():
+    return samples_folder+"query_paths.json"
+def get_samples_filename():
+    return samples_folder+"paths.json"
 
 # ### base features settings
 # def get_base_stats_file(ind): return "/stats/base_stats_"+str(ind)+".csv"
