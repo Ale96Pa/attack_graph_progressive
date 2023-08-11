@@ -1,6 +1,6 @@
 import random, hashlib
 
-def get_vulns_by_hostname(dev_hostname,devices,vulnerabilities):
+def get_vulns_by_hostname(dev_hostname,devices):
     cve_list=[]
     for host in devices:
         if host["hostname"] == dev_hostname:
@@ -73,7 +73,7 @@ def get_derivative_features(vuln):
         likelihood = 5
     return impact,likelihood
 
-def reachability_to_attack(reachability_path,devices,vulnerabilities):
+def reachability_to_attack(reachability_path,devices,vulnerabilities,steering_vulns):
     processed_targets={}
     trace = ""
     impacts=[]
@@ -81,13 +81,20 @@ def reachability_to_attack(reachability_path,devices,vulnerabilities):
     for edge in reachability_path:
         target_hostname = edge[1]
         if target_hostname not in processed_targets.keys():
-            vulns_edge = get_vulns_by_hostname(target_hostname,devices,vulnerabilities)
+            vulns_edge = get_vulns_by_hostname(target_hostname,devices)
             processed_targets[target_hostname] = vulns_edge
         else:
             vulns_edge = processed_targets[target_hostname]
         if len(vulns_edge)<=0: continue
         
-        attack_vuln = random.choice(vulns_edge)
+        steering_compliant_vulns = []
+        for v_edge in vulns_edge:
+            if v_edge in steering_vulns: steering_compliant_vulns.append(v_edge)
+
+        if len(steering_compliant_vulns)>0:
+            attack_vuln = random.choice(steering_compliant_vulns)
+        else:
+            attack_vuln = random.choice(vulns_edge)
         vuln,pre,post = retrieve_privileges(attack_vuln,vulnerabilities)
         src=pre+"@"+str(edge[0])
         dst=post+"@"+str(target_hostname)

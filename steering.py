@@ -4,6 +4,7 @@ from sklearn import tree
 from sklearn.tree import DecisionTreeClassifier
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.tree import export_text
 
 def isQuery(query,attack_path):
     for k in query.keys():
@@ -28,6 +29,34 @@ def convert_categorical_to_num(str_val):
     elif str_val == "LOCAL" or str_val=="HIGH": return 3
     elif str_val == "PHYSICAL" or str_val=="CRITICAL": return 4
     else: return 0
+def convert_num_to_categorical(num_val,metric,version):
+    if metric == "accessVector" or metric == "attackVector":
+        if num_val <= 1: return "NETWORK"
+        elif num_val >1 and num_val <=2: return "ADJACENT_NETWORK"
+        elif num_val >2 and num_val <=3: return "LOCAL"
+        else: return "PHYSICAL"
+    elif metric == "accessComplexity" or metric == "baseSeverity" or metric == "privilegesRequired" or metric == "attackComplexity":
+        if num_val == 0: return "NONE"
+        elif num_val <= 1: return "LOW"
+        elif num_val>1 and num_val <=2: return "MEDIUM"
+        elif num_val>2 and num_val <=3: return "HIGH"
+        else: return "CRITICAL"
+    elif metric == "integrityImpact" or metric == "confidentialityImpact" or metric == "availabilityImpact":
+        if version == 2:
+            if num_val == 0: return "NONE"
+            elif num_val <= 1: return "PARTIAL"
+            else: return "COMPLETE"
+        else:
+            if num_val == 0: return "NONE"
+            elif num_val <= 1: return "LOW"
+            elif num_val>1 and num_val <=2: return "MEDIUM"
+            elif num_val>2 and num_val <=3: return "HIGH"
+            else: return "CRITICAL"
+    elif metric == "authentication":
+        if num_val == 0: return "NONE"
+        elif num_val <= 1: return "SINGLE"
+        else: return "MULTIPLE"
+    return
 
 def base_features_vulnID(vuln_id,vulnerabilities):
     for vuln in vulnerabilities:
@@ -190,8 +219,61 @@ def _generate_expression(sample, tree, paths, feature, threshold):
 
     return expression
 
-from sklearn.tree import export_text
-def steering(qfile,ofile,vulnerabilities):
+def filter_vulnerabilities(conditions,vulnerabilities):
+    op = {'<=': lambda x, y: float(x) <= float(y),
+      '>': lambda x, y: float(x) > float(y)}
+
+    compliant_vulns=[]
+    for vuln in vulnerabilities:
+        isCompliant = True
+        for condition in conditions:
+            condition = condition.replace("(","").replace(")","")
+            metric,operator,value = condition.split(" ")
+            value = float(value)
+            if "cvssMetricV2" in vuln["metrics"]:
+                metricV2 = vuln["metrics"]["cvssMetricV2"][0]
+                metricCvssV2 = metricV2["cvssData"]
+
+                if metric == "baseScore": #numerical
+                    if not op[operator](metricCvssV2["baseScore"],value): isCompliant = False
+                elif metric == "baseSeverity": #categorical
+                    if not op[operator](convert_categorical_to_num(metricV2["baseSeverity"]),value): isCompliant = False
+                elif metric in ["impactScore","exploitabilityScore"]: #numerical
+                    if not op[operator](metricV2[metric],value): isCompliant = False
+                else: #categorical
+                    if not op[operator](convert_categorical_to_num(metricCvssV2[metric]),value): isCompliant = False
+                
+            if "cvssMetricV30" in vuln["metrics"] or "cvssMetricV31" in vuln["metrics"]:
+                if "cvssMetricV30" in vuln["metrics"]: metricV3 = vuln["metrics"]["cvssMetricV30"][0]
+                else: metricV3 = vuln["metrics"]["cvssMetricV31"][0]
+                metricCvssV3 = metricV3["cvssData"]
+
+                if metric == "baseScore": #numerical
+                    if not op[operator](metricCvssV3["baseScore"],value): isCompliant = False
+                elif metric in ["impactScore","exploitabilityScore"]: #numerical
+                    if not op[operator](metricV3[metric],value): isCompliant = False
+                else: #categorical
+                    if metric == "accessVector":
+                        if not op[operator](convert_categorical_to_num(metricCvssV3["attackVector"]),value): isCompliant = False
+                    elif metric == "accessComplexity":
+                        if not op[operator](convert_categorical_to_num(metricCvssV3["attackComplexity"]),value): isCompliant = False
+                    elif metric == "authentication":
+                        if not op[operator](convert_categorical_to_num(metricCvssV3["privilegesRequired"]),value): isCompliant = False
+                    else:
+                        if not op[operator](convert_categorical_to_num(metricCvssV3[metric]),value): isCompliant = False
+        if isCompliant: compliant_vulns.append(vuln["id"])
+    return compliant_vulns
+
+def convert_expression_to_vuln(expression,vulnerabilities):
+    disjunctions = expression.split(" or ")
+    all_vulns_compliant = []
+    for sub_expression in disjunctions:
+        conjunctions = sub_expression.split (" and ")
+        filtered_vuln = filter_vulnerabilities(conjunctions,vulnerabilities)
+        all_vulns_compliant+=filtered_vuln
+    return list(set(all_vulns_compliant))
+
+def get_steering_vulns(qfile,ofile,vulnerabilities):
     training_set = build_training_set(qfile,ofile,vulnerabilities)
     
     X = training_set.loc[:, training_set.columns != "query"]
@@ -204,7 +286,8 @@ def steering(qfile,ofile,vulnerabilities):
 
     paths = _extract_paths(X, dtree)
     expr = _generate_expression(training_set, tree_mod, paths, feature, threshold)
-    print(expr)
+
+    return convert_expression_to_vuln(expr,vulnerabilities)
 
     # features = list(training_set.columns)
     # features.remove("query")
@@ -216,4 +299,5 @@ if __name__ == "__main__":
     other_paths = "dataset/10_10_powerlaw_uniform_0.5_1/random/samples/paths.json"
     with open("dataset/10_10_powerlaw_uniform_0.5_1/10_10_powerlaw_uniform_0.5_1.json") as f:
         all_vulns = json.load(f)["vulnerabilities"]
-    steering(query_paths,other_paths,all_vulns)
+    vulns_test = get_steering_vulns(query_paths,other_paths,all_vulns)
+    print(vulns_test)

@@ -49,6 +49,7 @@ def run_experiment(params):
     collisions_other=[0]
     collision_condition=0
     isSteering=False
+    steering_vulnerabilities=[]
     try:
         while(collision_condition<=0.8):
             sampled_paths = sample_paths_reachability(RG,rg_nodes,config.num_samples,sampling_method)
@@ -56,7 +57,7 @@ def run_experiment(params):
             attack_paths_query = []
             attack_paths_other = []
             for path in sampled_paths:
-                single_attack_path = ap.reachability_to_attack(path,devices,vulnerabilities)
+                single_attack_path = ap.reachability_to_attack(path,devices,vulnerabilities,steering_vulnerabilities)
                 if steering.isQuery(query,single_attack_path): attack_paths_query.append(single_attack_path)
                 else: attack_paths_other.append(single_attack_path)
             
@@ -66,7 +67,10 @@ def run_experiment(params):
             
             if collision_condition >= 0.2: isSteering=True
             if isSteering:
-                print("steering procedure")
+                steering_vulnerabilities=steering.get_steering_vulns(filename_sample_query,filename_sample_other,vulnerabilities)
+                print(len(steering_vulnerabilities),len(vulnerabilities))
+            else:
+                print(collision_condition)
 
     except Exception:
         traceback.print_exc()
