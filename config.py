@@ -1,21 +1,22 @@
-import json
+import json, csv
 
 ### BENCHMARK parameters
-num_cores = 1
+num_cores = 6
 
 ### SAMPLING parameters
 sampling_algorithms = ["random"]#,"random", "bfs","dfs"]
-num_samples = 25
-collision_control = 3 #number of tuples to consider for average collisions
+num_samples = 50
+collision_control = 5 #number of tuples to consider for average collisions
+steering_types = ["none","steer"]
 
 
 ### NETWORK SETTING parameters
 nhosts = [10]
 nvulns = [10]
-topologies = ["powerlaw"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
+topologies = ["tree"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
 distro = ["uniform"] #uniform,bernoulli,poisson,binomial
 diversity = [0.5] #0,0.25,0.5,0.75,1
-num_experiments = 1
+num_experiments = 3
 
 ### NETWORK FILES parameters
 ROOT_FOLDER = "dataset/"
@@ -25,6 +26,7 @@ samples_folder = "/samples/"
 gt_folder = "ground_truth/"
 gt_paths = gt_folder+"GT_paths.json"
 gt_base = gt_folder+"base_gt.csv"
+stats_steering = stat_folder+"steering.csv"
 
 ### SAMPLING settings
 # def get_paths_file(ind, isSteering): 
@@ -35,10 +37,20 @@ gt_base = gt_folder+"base_gt.csv"
 #     if isSteering=="naive": return "/samples/nQpaths_"+str(ind)+".json"
 #     elif isSteering=="embedded": return "/samples/eQpaths_"+str(ind)+".json"
 #     else: return "/samples/Qpaths_"+str(ind)+".json"
-def get_query_samples_filename():
-    return samples_folder+"query_paths.json"
-def get_samples_filename():
-    return samples_folder+"paths.json"
+def get_query_samples_filename(steerType):
+    return samples_folder+steerType+"Query_paths.json"
+def get_samples_filename(steerType):
+    return samples_folder+steerType+"Paths.json"
+
+"""
+Define structure of the steering performance file
+"""
+def write_header_steering_performance(file_steering):
+    with open(file_steering, "w", newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(["iteration","num_samples","num_query_paths","num_other_paths",
+                         "steering_type","isSteering","collision_rate_query",
+                         "collision_rate_other","time_generation","time_steering"])
 
 # ### base features settings
 # def get_base_stats_file(ind): return "/stats/base_stats_"+str(ind)+".csv"

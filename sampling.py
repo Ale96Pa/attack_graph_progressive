@@ -33,5 +33,5 @@ def commit_paths_to_file(attack_paths,filename):
         json_data = json.dumps(all_paths, default=lambda o: o.__dict__, indent=2)
         outfile.write(json_data)
 
-    if len(attack_paths)<=0: return 0
-    return count_duplicates/len(attack_paths)
+    if len(attack_paths)<=0: return len(all_paths), 0
+    return len(all_paths), count_duplicates/len(attack_paths)
