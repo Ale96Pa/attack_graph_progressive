@@ -13,6 +13,7 @@ def get_vulns_by_hostname(dev_hostname,devices,vulnerabilities):
                     for app in iface["applications"]:
                         cve_list.append(app["cve_list"])
             return list(set([item for sublist in cve_list for item in sublist]))
+    return []
                 
 """
 These functions checks the pre-post condition chaining
@@ -84,6 +85,8 @@ def reachability_to_attack(reachability_path,devices,vulnerabilities):
             processed_targets[target_hostname] = vulns_edge
         else:
             vulns_edge = processed_targets[target_hostname]
+        if len(vulns_edge)<=0: continue
+        
         attack_vuln = random.choice(vulns_edge)
         vuln,pre,post = retrieve_privileges(attack_vuln,vulnerabilities)
         src=pre+"@"+str(edge[0])

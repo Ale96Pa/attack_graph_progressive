@@ -1,4 +1,5 @@
 import os, logging, json, random
+import traceback
 import networkx as nx
 from pebble import ProcessPool
 
@@ -8,17 +9,17 @@ import sampling
 import steering
 import config
 
-def sample_paths_reachability(RG,rg_nodes,num_samples,method):
+def sample_paths_reachability(G,rg_nodes,num_samples,method):
     sampled_paths=[]
     for i in range(0,num_samples):
         start_node = random.choice(rg_nodes)
         sampled_len = random.randint(2,len(rg_nodes))
         if method=="dfs":
-            sampled_paths.append(sampling.DFSampling(RG,start_node,sampled_len))
+            sampled_paths.append(sampling.DFSampling(G,start_node,sampled_len))
         elif method=="bfs":
-            sampled_paths.append(sampling.BFSampling(RG,start_node,sampled_len))
+            sampled_paths.append(sampling.BFSampling(G,start_node,sampled_len))
         else:
-            sampled_paths.append(sampling.random_sampling(RG,start_node,sampled_len))
+            sampled_paths.append(sampling.random_sampling(G,start_node,sampled_len))
     # remove duplicate and empty sampled paths
     return [list(tupl) for tupl in {tuple(item) for item in sampled_paths} if list(tupl) != []]
 
@@ -49,7 +50,7 @@ def run_experiment(params):
     collision_condition=0
     isSteering=False
     try:
-        while(collision_condition<=0.5):
+        while(collision_condition<=0.8):
             sampled_paths = sample_paths_reachability(RG,rg_nodes,config.num_samples,sampling_method)
             
             attack_paths_query = []
@@ -66,9 +67,9 @@ def run_experiment(params):
             if collision_condition >= 0.2: isSteering=True
             if isSteering:
                 print("steering procedure")
-                break
-    except Exception as e:
-        print(e)
+
+    except Exception:
+        traceback.print_exc()
     
 
 if __name__ == "__main__":
@@ -89,6 +90,6 @@ if __name__ == "__main__":
             params.append([network,method,QUERY])
 
     with ProcessPool(max_workers=config.num_cores) as pool:
-        process = pool.map(run_experiment, params, timeout=500)
+        process = pool.map(run_experiment, params)
         
 
