@@ -66,6 +66,7 @@ if __name__ == "__main__":
     if not os.path.exists(config.plot_folder): os.makedirs(config.plot_folder)
 
     for k in df_steers.keys():
+        ##TODO: group by experiment
         df_sampling = pd.concat(df_steers[k])
         averages_stats = df_sampling.groupby(['iteration','num_samples','steering_type']).median().reset_index()
         averages_stats.to_csv(config.plot_folder+"/avg_stats.csv",index=False)
