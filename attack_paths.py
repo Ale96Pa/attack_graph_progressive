@@ -74,6 +74,7 @@ def get_derivative_features(vuln):
     return impact,likelihood
 
 def reachability_to_attack(reachability_path,devices,vulnerabilities,steering_vulns):
+    # print("reachability_path")
     processed_targets={}
     trace = ""
     impacts=[]

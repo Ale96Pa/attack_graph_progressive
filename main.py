@@ -56,7 +56,7 @@ def run_experiment(params):
     count_iteration=0
     start_generation = time.perf_counter()
     try:
-        while(collision_condition<=0.8):
+        while(collision_condition<=0.95):
             sampled_paths = sample_paths_reachability(RG,rg_nodes,config.num_samples,sampling_method)
             
             attack_paths_query = []
@@ -65,6 +65,7 @@ def run_experiment(params):
                 single_attack_path = ap.reachability_to_attack(path,devices,vulnerabilities,steering_vulnerabilities)
                 if steering.isQuery(query,single_attack_path): attack_paths_query.append(single_attack_path)
                 else: attack_paths_other.append(single_attack_path)
+
             
             num_query_paths, coll_query = sampling.commit_paths_to_file(attack_paths_query,filename_sample_query)
             collisions_query.append(coll_query)
@@ -72,10 +73,11 @@ def run_experiment(params):
             collisions_other.append(coll_other)
             collision_condition = sum(collisions_query[-cc:])/len(collisions_query[-cc:])
             
-            if collision_condition >= 0.5: isSteering=True
+            if collision_condition >= config.start_steering_collision: isSteering=True
             start_steering = time.perf_counter()
             if isSteering and steer_type=="steering":
                 steering_vulnerabilities=steering.get_steering_vulns(filename_sample_query,filename_sample_other,vulnerabilities)
+                print(len(steering_vulnerabilities),len(vulnerabilities))
 
             end_time = time.perf_counter()
             count_iteration+=1
@@ -103,7 +105,7 @@ if __name__ == "__main__":
     build_dataset(clean_data=True)
     QUERY = {
         # 'length': [2,4],
-        'impact': [2,5],
+        'impact': [1,5],
         'likelihood': [0,4]
     }
 

@@ -5,14 +5,16 @@ import matplotlib.pyplot as plt
 
 import config
 
-def plot_lines_steering(folder,df_experiments):
+def plot_lines_steering(folder,df_experiments,sampling_algo=""):
+    plt.rcParams.update({'font.size': 24})
     fig, axs = plt.subplots()
     fig.set_figwidth(20)
     fig.set_figheight(10)
 
     if "isSteering" in df_experiments.columns:
-        index_steering = list(df_experiments[df_experiments.isSteering == True]["iteration"])[0]
-        print("Iteration where steering started: ", index_steering)
+        index_steering = list(df_experiments[df_experiments.isSteering == True]["iteration"])
+        if len(index_steering)>0:
+            print("Iteration where steering started: ", index_steering[0])
     
 
     grouped_by_sample = df_experiments.groupby(["steering_type"])
@@ -20,20 +22,20 @@ def plot_lines_steering(folder,df_experiments):
     for sample, item in grouped_by_sample:
         sample_df = grouped_by_sample.get_group(sample)
 
-        tot_paths = max(list(sample_df["num_query_paths"]))
+        tot_paths = max(list(sample_df["num_query_paths"]))#+max(list(sample_df["num_other_paths"]))
 
         x_vals = sample_df["iteration"]
-        y_vals_0 = sample_df["num_query_paths"]#/tot_paths
+        y_vals_0 = sample_df["num_query_paths"]/tot_paths
 
         labels_legend.append(sample)
-        axs.plot(x_vals,y_vals_0)
+        axs.plot(x_vals,y_vals_0,linewidth = '3')
     
     axs.set_xlabel("iterations")
     axs.set_ylabel("num. in-query paths")
     axs.legend(title="Steering", labels=labels_legend)
-    axs.set_title("Included Paths")
+    axs.set_title("Percentage of Queried Paths to total")
 
-    plt.savefig(folder+config.plot_folder+"steering.png", bbox_inches='tight')
+    plt.savefig(folder+config.plot_folder+sampling_algo+"_steering.png", bbox_inches='tight')
 
 if __name__ == "__main__":
     # for subfolder in os.listdir(config.ROOT_FOLDER):
@@ -67,4 +69,4 @@ if __name__ == "__main__":
         df_sampling = pd.concat(df_steers[k])
         averages_stats = df_sampling.groupby(['iteration','num_samples','steering_type']).median().reset_index()
         averages_stats.to_csv(config.plot_folder+"/avg_stats.csv",index=False)
-        plot_lines_steering("",averages_stats)
+        plot_lines_steering("",averages_stats,k)
