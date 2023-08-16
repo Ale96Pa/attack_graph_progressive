@@ -77,7 +77,6 @@ def run_experiment(params):
             start_steering = time.perf_counter()
             if isSteering and steer_type=="steering":
                 steering_vulnerabilities=steering.get_steering_vulns(filename_sample_query,filename_sample_other,vulnerabilities)
-                print(len(steering_vulnerabilities),len(vulnerabilities))
 
             end_time = time.perf_counter()
             count_iteration+=1
@@ -91,7 +90,7 @@ def run_experiment(params):
             if count_iteration%25 == 0: 
                 logging.info("Iteration %d of experiment %s: retrieved %d paths",
                              count_iteration,subfolder,num_query_paths+num_other_paths)
-
+        logging.info("[END] experiment %s", subfolder)
     except Exception as e:
         traceback.print_exc()
         logging.error("[ERROR] %s", e)

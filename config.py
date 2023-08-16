@@ -1,10 +1,10 @@
 import json, csv
 
 ### BENCHMARK parameters
-num_cores = 2
+num_cores = 4
 
 ### SAMPLING parameters
-sampling_algorithms = ["random"]#,"random", "bfs","dfs"]
+sampling_algorithms = ["random","dfs"]#,"random", "bfs","dfs"]
 num_samples = 25
 collision_control = 5 #number of tuples to consider for average collisions
 steering_types = ["steering","none"]
@@ -13,7 +13,7 @@ steering_types = ["steering","none"]
 ### NETWORK SETTING parameters
 nhosts = [10]
 nvulns = [10]
-topologies = ["random"]#,"tree"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
+topologies = ["random","powerlaw"]#,"tree"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
 distro = ["uniform"] #uniform,bernoulli,poisson,binomial
 diversity = [0.5] #0,0.25,0.5,0.75,1
 num_experiments = 5

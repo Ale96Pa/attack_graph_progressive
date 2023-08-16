@@ -37,36 +37,44 @@ def plot_lines_steering(folder,df_experiments,sampling_algo=""):
 
     plt.savefig(folder+config.plot_folder+sampling_algo+"_steering.png", bbox_inches='tight')
 
+def isExperiment(n,v,t,d,u,s,setting):
+    if setting['n'] == n and setting['v'] == v and setting['t'] == t and \
+        setting['d'] == d and setting['u'] == u and setting['s'] == s:
+        return True
+    else: return False
+
 if __name__ == "__main__":
-    # for subfolder in os.listdir(config.ROOT_FOLDER):
-    #     for samplingType in os.listdir(config.ROOT_FOLDER+subfolder):
-    #         if samplingType in config.sampling_algorithms:
-    #             folder_experiment = config.ROOT_FOLDER+subfolder+"/"+samplingType+"/"
-    #             file_steering_stats = config.ROOT_FOLDER+subfolder+"/"+samplingType+"/"+config.stats_steering
-    #             df_steer = pd.read_csv(file_steering_stats)
-    #             plot_lines_steering(folder_experiment,df_steer)
+    experiment_settings={
+        'n': 10,
+        'v': 10,
+        't':"powerlaw",
+        'd':"uniform",
+        'u':0.5,
+        's':"random"
+    }
+
+    df_steers = {}
     for n in config.nhosts:
         for v in config.nvulns:
             for t in config.topologies:
                 for d in config.distro:
                     for u in config.diversity:
-                        df_steers = {}
                         for exp in range(1,config.num_experiments+1):
                             base_name = str(n)+'_'+str(v)+'_'+t+'_'+d+'_'+str(u)+'_'+str(exp)
                             folder_name = config.ROOT_FOLDER+base_name+"/"
                             for samplingType in os.listdir(folder_name):
                                 if samplingType in config.sampling_algorithms:
-                                    file_steering_stats = folder_name+samplingType+"/"+config.stats_steering
-                                    df_experiment = pd.read_csv(file_steering_stats)
-                                    plot_lines_steering(folder_name+samplingType+"/",df_experiment)
+                                    if isExperiment(n,v,t,d,u,samplingType,experiment_settings):
+                                        file_steering_stats = folder_name+samplingType+"/"+config.stats_steering
+                                        df_experiment = pd.read_csv(file_steering_stats)
+                                        plot_lines_steering(folder_name+samplingType+"/",df_experiment)
 
-                                    if samplingType not in df_steers.keys(): df_steers[samplingType] = [df_experiment]
-                                    else: df_steers[samplingType].append(df_experiment)
+                                        if samplingType not in df_steers.keys(): df_steers[samplingType] = [df_experiment]
+                                        else: df_steers[samplingType].append(df_experiment)
     
     if not os.path.exists(config.plot_folder): os.makedirs(config.plot_folder)
 
     for k in df_steers.keys():
-        ##TODO: group by experiment
         df_sampling = pd.concat(df_steers[k])
         averages_stats = df_sampling.groupby(['iteration','num_samples','steering_type']).median().reset_index()
         averages_stats.to_csv(config.plot_folder+"/avg_stats.csv",index=False)
