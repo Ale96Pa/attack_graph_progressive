@@ -45,6 +45,8 @@ def run_experiment(params):
         RG.add_edge(net_edge["host_link"][0],net_edge["host_link"][1])
     rg_nodes = list(RG.nodes())
 
+    logging.info("[START] experiment %s, sampling: %s, steering: %s", subfolder,sampling_method,steer_type)
+
     """
     Sampling the reachability paths
     """
@@ -90,10 +92,10 @@ def run_experiment(params):
             if count_iteration%25 == 0: 
                 logging.info("Iteration %d of experiment %s: retrieved %d paths",
                              count_iteration,subfolder,num_query_paths+num_other_paths)
-        logging.info("[END] experiment %s", subfolder)
+        logging.info("[END] experiment %s, sampling: %s, steering: %s", subfolder,sampling_method,steer_type)
     except Exception as e:
         traceback.print_exc()
-        logging.error("[ERROR] %s", e)
+        logging.error("[ERROR] %s on experiment %s, sampling: %s, steering: %s", e,subfolder,sampling_method,steer_type)
     
 
 if __name__ == "__main__":

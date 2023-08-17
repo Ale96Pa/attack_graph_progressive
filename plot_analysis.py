@@ -8,7 +8,7 @@ import config
 def plot_lines_steering(folder,df_experiments,sampling_algo=""):
     plt.rcParams.update({'font.size': 24})
     fig, axs = plt.subplots()
-    fig.set_figwidth(20)
+    fig.set_figwidth(15)
     fig.set_figheight(10)
 
     if "isSteering" in df_experiments.columns:
@@ -31,7 +31,7 @@ def plot_lines_steering(folder,df_experiments,sampling_algo=""):
         axs.plot(x_vals,y_vals_0,linewidth = '3')
     
     axs.set_xlabel("iterations")
-    axs.set_ylabel("num. in-query paths")
+    axs.set_ylabel("% query paths")
     axs.legend(title="Steering", labels=labels_legend)
     axs.set_title("Percentage of Queried Paths to total")
 
