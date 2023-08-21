@@ -79,6 +79,7 @@ def reachability_to_attack(reachability_path,devices,vulnerabilities,steering_vu
     trace = ""
     impacts=[]
     likelihoods=[]
+    vulnerabilities_path = []
     for edge in reachability_path:
         target_hostname = edge[1]
         if target_hostname not in processed_targets.keys():
@@ -103,6 +104,7 @@ def reachability_to_attack(reachability_path,devices,vulnerabilities,steering_vu
         if edge == reachability_path[-1]: trace += src+"#"+attack_vuln+"#"+dst
         else: trace += src+"#"+attack_vuln+"#"+dst+"##"
 
+        vulnerabilities_path.append(vuln)
         impact,likelihood=get_derivative_features(vuln)
         impacts.append(impact)
         likelihoods.append(likelihood)
@@ -110,7 +112,8 @@ def reachability_to_attack(reachability_path,devices,vulnerabilities,steering_vu
     return {
         "id": hashlib.sha256(str(trace).encode("utf-8")).hexdigest(),
         "trace": trace,
+        "length": len(impacts),
         "impact": sum(impacts)/len(impacts),
         "likelihood": sum(likelihoods)/len(likelihoods),
-    }
+    }, vulnerabilities_path
 

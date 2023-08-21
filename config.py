@@ -1,19 +1,19 @@
 import json, csv
 
 ### BENCHMARK parameters
-num_cores = 4
+num_cores = 2
 
 ### SAMPLING parameters
-sampling_algorithms = ["random","dfs"]#,"random", "bfs","dfs"]
-num_samples = 25
-collision_control = 5 #number of tuples to consider for average collisions
+sampling_algorithms = ["random"]#,"random", "bfs","dfs"]
+num_samples = 50
+collision_control = 7 #number of tuples to consider for average collisions
 steering_types = ["steering","none"]
 
 
 ### NETWORK SETTING parameters
 nhosts = [10]
-nvulns = [10]
-topologies = ["random","powerlaw"]#,"tree"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
+nvulns = [5]
+topologies = ["powerlaw"]#,"tree"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
 distro = ["uniform"] #uniform,bernoulli,poisson,binomial
 diversity = [0.5] #0,0.25,0.5,0.75,1
 num_experiments = 5
@@ -26,7 +26,9 @@ plot_folder = "plot/"
 samples_folder = "/samples/"
 gt_folder = "ground_truth/"
 gt_paths = gt_folder+"GT_paths.json"
-gt_base = gt_folder+"base_gt.csv"
+gt_base = gt_folder+"GT_base.json"
+
+stats_sampling = stat_folder+"sampling.json"
 stats_steering = stat_folder+"steering.csv"
 
 ### SAMPLING settings

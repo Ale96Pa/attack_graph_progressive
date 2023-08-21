@@ -1,7 +1,8 @@
-import uuid
-import json
+# import uuid
+import json, hashlib
+from attack_paths import get_derivative_features
 
-from base_features import base_features_distro
+# from base_features import base_features_distro
 
 class Node:
     def __init__(self, privilege, host):
@@ -24,11 +25,11 @@ class CompactedEdge:
         self.dst = dst
         self.vulnList = vuln_list
 
-def base_features(edges):
-    vulns = []
-    for edge in edges:
-        vulns.append(edge.vulnerability)
-    return base_features_distro(vulns)
+# def base_features(edges):
+#     vulns = []
+#     for edge in edges:
+#         vulns.append(edge.vulnerability)
+#     return base_features_distro(vulns)
 
 def monotonicity(src, trace):
     if src in trace: return True
@@ -41,53 +42,62 @@ def derivative_features(edges):
     for edge in edges:
         v = edge.vulnerability
         if not monotonicity(str(edge.src.host["hostname"])+"@"+edge.src.privilege,trace):
-            trace+=str(edge.src.host["hostname"])+"@"+edge.src.privilege+"#"+\
-                edge.vulnerability["id"]+"#"+\
-                str(edge.dst.host["hostname"])+"@"+edge.dst.privilege+"##"
+            # trace+=str(edge.src.host["hostname"])+"@"+edge.src.privilege+"#"+\
+            #     edge.vulnerability["id"]+"#"+\
+            #     str(edge.dst.host["hostname"])+"@"+edge.dst.privilege+"##"
+            src=edge.src.privilege+"@"+str(edge.src.host["hostname"])
+            attack_vuln=edge.vulnerability["id"]
+            dst=edge.dst.privilege+"@"+str(edge.dst.host["hostname"])
+
+
+            if edge == edges[-1]: trace += src+"#"+attack_vuln+"#"+dst
+            else: trace += src+"#"+attack_vuln+"#"+dst+"##"
             
-            if "cvssMetricV2" in v["metrics"]:
-                metricV2 = v["metrics"]["cvssMetricV2"][0]
-                impact = metricV2["impactScore"]
-                likelihood = metricV2["exploitabilityScore"]
-            elif "cvssMetricV30" in v["metrics"]:
-                metricV3 = v["metrics"]["cvssMetricV30"][0]
-                impact = metricV3["impactScore"]
-                likelihood = metricV3["exploitabilityScore"]
-            elif "cvssMetricV31" in v["metrics"]:
-                metricV3 = v["metrics"]["cvssMetricV31"][0]
-                impact = metricV3["impactScore"]
-                likelihood = metricV3["exploitabilityScore"]
-            else: #default values
-                impact = 5 
-                likelihood = 5
+            # if "cvssMetricV2" in v["metrics"]:
+            #     metricV2 = v["metrics"]["cvssMetricV2"][0]
+            #     impact = metricV2["impactScore"]
+            #     likelihood = metricV2["exploitabilityScore"]
+            # elif "cvssMetricV30" in v["metrics"]:
+            #     metricV3 = v["metrics"]["cvssMetricV30"][0]
+            #     impact = metricV3["impactScore"]
+            #     likelihood = metricV3["exploitabilityScore"]
+            # elif "cvssMetricV31" in v["metrics"]:
+            #     metricV3 = v["metrics"]["cvssMetricV31"][0]
+            #     impact = metricV3["impactScore"]
+            #     likelihood = metricV3["exploitabilityScore"]
+            # else: #default values
+            #     impact = 5 
+            #     likelihood = 5
+            impact,likelihood = get_derivative_features(v)
 
             impact_p.append(impact)
             likelihood_p.append(likelihood)
     
-    length = trace.count("##")
-    return { "trace": trace,
-        "impact": sum(impact_p)/length,
-        "likelihood": sum(likelihood_p)/length}
+    length = len(impact_p)
+    return {"trace": trace,
+            "length": length,
+            "impact": sum(impact_p)/length,
+            "likelihood": sum(likelihood_p)/length}
 
 class AttackPath:
     def __init__(self,nodes,edges):
-        self.id = str(uuid.uuid4())
         self.nodes = nodes
         self.edges = edges
         features = derivative_features(edges)
-        self.length = features["trace"].count("##")
+        self.length = features["length"]
         self.trace = features["trace"]
         self.impact = features["impact"]
         self.likelihood = features["likelihood"]
-        self.base_features = base_features(edges)
+        self.id = hashlib.sha256(str(features["trace"]).encode("utf-8")).hexdigest()
+        # self.base_features = base_features(edges)
 
     def get_features(self):
         return {"id": self.id,
                 "length": self.length,
                 "trace": self.trace,
                 "impact": self.impact,
-                "likelihood": self.likelihood,
-                "base_features": self.base_features}
+                "likelihood": self.likelihood}
+                # "base_features": self.base_features}
     
     def exists(self, paths_file):
         with open(paths_file) as pf:

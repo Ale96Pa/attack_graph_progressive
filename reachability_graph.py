@@ -104,7 +104,7 @@ def build_distribution(distro, num_nodes, num_vulns):
     
     else: 
         vulns_distro = {}
-        for i in range(1,num_nodes+1): vulns_distro[i] = num_vulns
+        for i in range(0,num_nodes): vulns_distro[i] = num_vulns
         return vulns_distro
 
 """
@@ -186,7 +186,7 @@ def build_reachability(base_folder,filename):
     distro=params[3]
     diversity=float(params[4])
 
-    nodes = list(range(1,nhost+1))
+    nodes = list(range(0,nhost))
     G = build_topology(topology,nodes)
     if len(G.edges()) == 0:
         filename = filename.replace(topology,"mesh")
@@ -260,7 +260,7 @@ def build_dataset(clean_data=False):
                                 stat_folder = folder_name_sample+config.stat_folder
                                 plot_folder = folder_name_sample+config.plot_folder
                                 samples_folder = folder_name_sample+config.samples_folder
-                                gt_folder = folder_name_sample+config.gt_folder
+                                gt_folder = folder_name+config.gt_folder
                                 if not os.path.exists(stat_folder): os.mkdir(stat_folder)
                                 if not os.path.exists(plot_folder): os.mkdir(plot_folder)
                                 if not os.path.exists(samples_folder): os.mkdir(samples_folder)

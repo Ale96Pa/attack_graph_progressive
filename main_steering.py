@@ -4,6 +4,7 @@ from pebble import ProcessPool
 
 from reachability_graph import build_dataset
 import attack_paths as ap
+import features_management as fm
 import sampling
 import steering
 import config
@@ -30,6 +31,7 @@ def run_experiment(params):
     filename_sample_query = config.ROOT_FOLDER+subfolder+"/"+sampling_method+config.get_query_samples_filename(steer_type)
     filename_sample_other = config.ROOT_FOLDER+subfolder+"/"+sampling_method+config.get_samples_filename(steer_type)
     cc = config.collision_control
+    filename_sampling_stats = config.ROOT_FOLDER+subfolder+"/"+sampling_method+"/"+config.stats_sampling
     filename_steering_stats = config.ROOT_FOLDER+subfolder+"/"+sampling_method+"/"+config.stats_steering
 
     with open(network_file) as net_f: file_content = json.load(net_f)
@@ -48,50 +50,82 @@ def run_experiment(params):
     logging.info("[START] experiment %s, sampling: %s, steering: %s", subfolder,sampling_method,steer_type)
 
     """
+    Ground truth of base features distribution
+    """
+    base_features_gt_filename = config.ROOT_FOLDER+subfolder+"/"+config.gt_base
+    GT_base_stats = fm.base_features_distro(vulnerabilities)
+    if not os.path.exists(base_features_gt_filename):
+        with open(base_features_gt_filename, "w") as outfile:
+            json_base_gt = json.dumps(GT_base_stats, default=lambda o: o.__dict__, indent=2)
+            outfile.write(json_base_gt)
+
+    """
     Sampling the reachability paths
     """
     collisions_query=[0]
     collisions_other=[0]
-    collision_condition=0
+    collision_condition_other=0
+    collision_condition_query=0
     isSteering=False
     steering_vulnerabilities=[]
     count_iteration=0
+    sampled_vulnerabilities=[]
     start_generation = time.perf_counter()
     try:
-        while(collision_condition<=0.95):
+        while(collision_condition_query<=0.9):
+        # while((collision_condition_other+collision_condition_query)/2<=0.8):
+            count_iteration+=1
             sampled_paths = sample_paths_reachability(RG,rg_nodes,config.num_samples,sampling_method)
             
             attack_paths_query = []
             attack_paths_other = []
             for path in sampled_paths:
-                single_attack_path = ap.reachability_to_attack(path,devices,vulnerabilities,steering_vulnerabilities)
+                single_attack_path, path_vulns = ap.reachability_to_attack(path,devices,vulnerabilities,steering_vulnerabilities)
                 if steering.isQuery(query,single_attack_path): attack_paths_query.append(single_attack_path)
                 else: attack_paths_other.append(single_attack_path)
-
+                
+                sampled_vulnerabilities+=path_vulns
             
-            num_query_paths, coll_query = sampling.commit_paths_to_file(attack_paths_query,filename_sample_query)
+            num_query_paths, coll_query = sampling.commit_paths_to_file(attack_paths_query,filename_sample_query,count_iteration)
             collisions_query.append(coll_query)
-            num_other_paths, coll_other = sampling.commit_paths_to_file(attack_paths_other,filename_sample_other)
+            num_other_paths, coll_other = sampling.commit_paths_to_file(attack_paths_other,filename_sample_other,count_iteration)
             collisions_other.append(coll_other)
-            collision_condition = sum(collisions_query[-cc:])/len(collisions_query[-cc:])
+
+            collision_condition_query = sum(collisions_query[-cc:])/cc
+            collision_condition_other = sum(collisions_other[-cc:])/cc
             
-            if collision_condition >= config.start_steering_collision: isSteering=True
+            if collision_condition_query >= config.start_steering_collision: isSteering=True
             start_steering = time.perf_counter()
             if isSteering and steer_type=="steering":
                 steering_vulnerabilities=steering.get_steering_vulns(filename_sample_query,filename_sample_other,vulnerabilities)
+            
+            if steer_type=="none":
+                distro_sampled_vuln = fm.base_features_distro(sampled_vulnerabilities)
+                stats_compare_vuln = fm.compare_stats(GT_base_stats, distro_sampled_vuln)
+
+                stats_compare_vuln["type"] = "stats"
+                stats_compare_vuln["collision_rate"] = (collision_condition_other+collision_condition_query)/2
+                stats_compare_vuln["iteration"] = count_iteration
+                stats_compare_vuln["sample_size"] = config.num_samples
+
+                distro_sampled_vuln["type"] = "sample"
+                distro_sampled_vuln["collision_rate"] = (collision_condition_other+collision_condition_query)/2
+                distro_sampled_vuln["iteration"] = count_iteration
+                distro_sampled_vuln["sample_size"] = config.num_samples
+
+                sampling.write_base_sample_iteration(filename_sampling_stats,[distro_sampled_vuln,stats_compare_vuln])
 
             end_time = time.perf_counter()
-            count_iteration+=1
             with open(filename_steering_stats, "a", newline='') as f_steer:
                 writer = csv.writer(f_steer)
                 writer.writerow([count_iteration,config.num_samples,num_query_paths,
-                                 num_other_paths,steer_type,isSteering,collision_condition,
-                                 sum(collisions_other[-cc:])/len(collisions_other[-cc:]),
+                                 num_other_paths,steer_type,isSteering,collision_condition_query,
+                                 collision_condition_other,
                                  end_time-start_generation,end_time-start_steering])
                 
             if count_iteration%25 == 0: 
-                logging.info("Iteration %d of experiment %s: retrieved %d paths",
-                             count_iteration,subfolder,num_query_paths+num_other_paths)
+                logging.info("Iteration %d of experiment %s: collision query %f, collision other %f",
+                             count_iteration,subfolder,collision_condition_query,collision_condition_other)
         logging.info("[END] experiment %s, sampling: %s, steering: %s", subfolder,sampling_method,steer_type)
     except Exception as e:
         traceback.print_exc()
