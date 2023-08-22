@@ -24,15 +24,21 @@ def sample_paths_reachability(G,rg_nodes,num_samples,method):
     return [list(tupl) for tupl in {tuple(item) for item in sampled_paths} if list(tupl) != []]
 
 def run_experiment(params):
-    logging.basicConfig(filename='logging/experiments.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s: %(message)s')
-    subfolder,sampling_method,query,steer_type = params
+    logging.basicConfig(filename='logging/experiments.log', level=logging.DEBUG, 
+                        format='%(asctime)s - %(levelname)s: %(message)s')
+    subfolder,sampling_method,query,steer_type,num_exp = params
 
-    network_file = config.ROOT_FOLDER+subfolder+"/"+subfolder+".json"
-    filename_sample_query = config.ROOT_FOLDER+subfolder+"/"+sampling_method+config.get_query_samples_filename(steer_type)
-    filename_sample_other = config.ROOT_FOLDER+subfolder+"/"+sampling_method+config.get_samples_filename(steer_type)
+    network_file = config.ROOT_FOLDER+subfolder+"/"+config.gt_folder+subfolder+".json"
+    filename_sample_query = config.ROOT_FOLDER+subfolder+"/"+sampling_method+\
+                "/exp"+str(num_exp)+config.get_query_samples_filename(steer_type)
+    filename_sample_other = config.ROOT_FOLDER+subfolder+"/"+sampling_method+\
+                "/exp"+str(num_exp)+config.get_samples_filename(steer_type)
+    filename_sampling_stats = config.ROOT_FOLDER+subfolder+"/"+sampling_method+\
+                "/exp"+str(num_exp)+"/"+config.stats_sampling
+    filename_steering_stats = config.ROOT_FOLDER+subfolder+"/"+sampling_method+\
+                "/exp"+str(num_exp)+"/"+config.stats_steering
+
     cc = config.collision_control
-    filename_sampling_stats = config.ROOT_FOLDER+subfolder+"/"+sampling_method+"/"+config.stats_sampling
-    filename_steering_stats = config.ROOT_FOLDER+subfolder+"/"+sampling_method+"/"+config.stats_steering
 
     with open(network_file) as net_f: file_content = json.load(net_f)
     edges_reachability = file_content["edges"]
@@ -47,7 +53,8 @@ def run_experiment(params):
         RG.add_edge(net_edge["host_link"][0],net_edge["host_link"][1])
     rg_nodes = list(RG.nodes())
 
-    logging.info("[START] experiment %s, sampling: %s, steering: %s", subfolder,sampling_method,steer_type)
+    logging.info("[START] folder %s, experiment %d, sampling: %s, steering: %s", 
+                 subfolder,num_exp,sampling_method,steer_type)
 
     """
     Ground truth of base features distribution
@@ -72,7 +79,7 @@ def run_experiment(params):
     sampled_vulnerabilities=[]
     start_generation = time.perf_counter()
     try:
-        while(collision_condition_query<=0.9):
+        while(collision_condition_query<=0.9 and collision_condition_other<=0.8):
         # while((collision_condition_other+collision_condition_query)/2<=0.8):
             count_iteration+=1
             sampled_paths = sample_paths_reachability(RG,rg_nodes,config.num_samples,sampling_method)
@@ -84,7 +91,10 @@ def run_experiment(params):
                 if steering.isQuery(query,single_attack_path): attack_paths_query.append(single_attack_path)
                 else: attack_paths_other.append(single_attack_path)
                 
-                sampled_vulnerabilities+=path_vulns
+                for new_vuln in path_vulns:
+                    existing_ids = [val['id'] for val in sampled_vulnerabilities]
+                    if new_vuln["id"] not in existing_ids:
+                        sampled_vulnerabilities.append(new_vuln)
             
             num_query_paths, coll_query = sampling.commit_paths_to_file(attack_paths_query,filename_sample_query,count_iteration)
             collisions_query.append(coll_query)
@@ -100,6 +110,7 @@ def run_experiment(params):
                 steering_vulnerabilities=steering.get_steering_vulns(filename_sample_query,filename_sample_other,vulnerabilities)
             
             if steer_type=="none":
+                print(len(sampled_vulnerabilities))         
                 distro_sampled_vuln = fm.base_features_distro(sampled_vulnerabilities)
                 stats_compare_vuln = fm.compare_stats(GT_base_stats, distro_sampled_vuln)
 
@@ -124,9 +135,9 @@ def run_experiment(params):
                                  end_time-start_generation,end_time-start_steering])
                 
             if count_iteration%25 == 0: 
-                logging.info("Iteration %d of experiment %s: collision query %f, collision other %f",
-                             count_iteration,subfolder,collision_condition_query,collision_condition_other)
-        logging.info("[END] experiment %s, sampling: %s, steering: %s", subfolder,sampling_method,steer_type)
+                logging.info("Iteration %d of setting %s experiment %d steering %s: collision query %f, collision other %f",
+                             count_iteration,subfolder,num_exp,steer_type,collision_condition_query,collision_condition_other)
+        logging.info("[END] folder %s, experiment %d, sampling: %s, steering: %s", subfolder,num_exp,sampling_method,steer_type)
     except Exception as e:
         traceback.print_exc()
         logging.error("[ERROR] %s on experiment %s, sampling: %s, steering: %s", e,subfolder,sampling_method,steer_type)
@@ -148,7 +159,8 @@ if __name__ == "__main__":
     for network in os.listdir(config.ROOT_FOLDER):
         for method in config.sampling_algorithms:
             for steer_type in config.steering_types:
-                params.append([network,method,QUERY,steer_type])
+                for experiment in range(1,config.num_experiments+1):
+                    params.append([network,method,QUERY,steer_type,experiment])
 
     with ProcessPool(max_workers=config.num_cores) as pool:
         process = pool.map(run_experiment, params)

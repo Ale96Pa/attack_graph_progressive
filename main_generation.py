@@ -40,7 +40,7 @@ This function generate all the attack paths (ground truth) for a given network
 def generate_all_paths(subfolder):
     logging.basicConfig(filename='logging/generation.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s: %(message)s')
 
-    network_file = config.ROOT_FOLDER+subfolder+"/"+subfolder+".json"
+    network_file = config.ROOT_FOLDER+subfolder+"/"+config.gt_folder+subfolder+".json"
     gt_paths_file = config.ROOT_FOLDER+subfolder+"/"+config.gt_paths
     if os.path.exists(gt_paths_file):
         logging.warning("Ground Truth %s already GENERATED.", gt_paths_file)
@@ -124,8 +124,6 @@ if __name__ == "__main__":
     """
     parameters_gt = []
     for subfolder in os.listdir(config.ROOT_FOLDER):
-        if "random" in subfolder: parameters_gt.append(subfolder)
-        else: 
-            if "0.5_1" in subfolder: parameters_gt.append(subfolder)
+        parameters_gt.append(subfolder)
     with ProcessPool(max_workers=config.num_cores) as pool:
         process = pool.map(generate_all_paths, parameters_gt)
