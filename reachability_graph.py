@@ -254,9 +254,6 @@ def build_dataset(clean_data=False):
                             if correct_folder != folder_name:
                                 os.rename(folder_name, correct_folder)
                                 folder_name = correct_folder
-                            
-                        # plot_folder = folder_name+config.plot_folder
-                        # if not os.path.exists(plot_folder): os.mkdir(plot_folder)
 
                         for sampling in config.sampling_algorithms:
                             folder_name_sample=folder_name+sampling+"/"
@@ -295,9 +292,6 @@ def build_dataset_performance(clean_data=False):
                             if correct_folder != folder_name:
                                 os.rename(folder_name, correct_folder)
                                 folder_name = correct_folder
-                            
-                        # plot_folder = folder_name+config.plot_folder
-                        # if not os.path.exists(plot_folder): os.mkdir(plot_folder)
 
                         for sampling in config.sampling_algorithms:
                             folder_name_sample=folder_name+sampling+"/"

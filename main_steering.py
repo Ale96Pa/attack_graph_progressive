@@ -82,8 +82,6 @@ def run_experiment(params):
     track_precisions=[]
     try:
         while(collision_condition_query<=0.9 or collision_condition_other<=0.9):
-        # while((collision_condition_query<=0.995 or steer_type=="steering") and (collision_condition_query<=0.98 or collision_condition_other<=0.98 or steer_type=="none")):
-        # while((collision_condition_other+collision_condition_query)/2<=0.8):
             count_iteration+=1
             sampled_paths = sample_paths_reachability(RG,rg_nodes,config.num_samples,sampling_method)
             
@@ -162,7 +160,7 @@ if __name__ == "__main__":
     Build dataset reachability graphs according to network settings 
     hosts,vulnerabilities,topology,diversity,distribution (see config file)
     """
-    build_dataset(clean_data=True)
+    build_dataset(clean_data=False)
     QUERY = {
         # 'length': [2,4],
         'impact': [1,5],

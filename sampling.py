@@ -11,7 +11,7 @@ def random_sampling(G,start_node,len_paths):
     for _ in range(len_paths - 1):
         neighbors = list(G.neighbors(path[-1]))
         if not neighbors:
-            break  # Stop if there are no more neighbors
+            break
         next_node = random.choice(neighbors)
         path.append(next_node)
 

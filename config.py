@@ -13,8 +13,8 @@ precision_window = 10
 
 ### NETWORK SETTING parameters
 nhosts = [10]
-nvulns = [10]
-topologies = ["powerlaw"]#,"tree"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
+nvulns = [5]
+topologies = ["random"]#,"tree"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
 distro = ["uniform"] #uniform,bernoulli,poisson,binomial
 diversity = [1] #0,0.25,0.5,0.75,1
 num_experiments = 3

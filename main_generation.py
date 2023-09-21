@@ -35,7 +35,6 @@ def build_reachability_graph(edges_reachability, devices):
     return G
 
 def reachability_to_attack(reachability_path,devices,vulnerabilities,path_vulns):
-    processed_targets={}
     trace = ""
     impacts=[]
     likelihoods=[]
@@ -43,14 +42,6 @@ def reachability_to_attack(reachability_path,devices,vulnerabilities,path_vulns)
     counter_edge=0
     for edge in reachability_path:
         target_hostname = edge[1]
-        # if target_hostname not in processed_targets.keys():
-        #     vulns_edge = get_vulns_by_hostname(target_hostname,devices)
-        #     processed_targets[target_hostname] = vulns_edge
-        # else:
-        #     vulns_edge = processed_targets[target_hostname]
-        # if len(vulns_edge)<=0: continue
-        
-        # for attack_vuln in vulns_edge:
         attack_vuln = path_vulns[counter_edge]
         vuln,pre,post = retrieve_privileges(attack_vuln,vulnerabilities)
         src=pre+"@"+str(edge[0])
@@ -127,77 +118,6 @@ def generate_all_paths(subfolder):
         logging.error("[ERROR] %s on %s", e,gt_paths_file)
     
     return len(existing_paths+attack_paths)
-
-
-    # permutations = list(itertools.permutations(G.nodes(), 2))
-    # reach_paths = []
-    # for couple in permutations:
-    #     src = couple[0]
-    #     dst = couple[1]
-    #     curr_paths = nx.all_simple_edge_paths(G, source=src, target=dst)
-    #     for p in curr_paths:
-    #         reach_paths.append(p)
-    
-    # logging.info("[START] generation of ground truth: %s with %d reachability paths.", gt_paths_file, len(reach_paths))
-    
-    # all_paths=[]
-    # all_traces=[]
-    # count=0
-    # for path in reach_paths:
-    #     one_hop_paths = []
-    #     for edge in path:
-    #         for v in vulns[edge]:
-    #             vuln,req,gain = retrieve_privileges(v,vulnerabilities)            
-    #             for dev in devices:
-    #                 if dev["hostname"] == edge[1]: dst_dev = dev
-    #                 elif dev["hostname"] == edge[0]: src_dev = dev
-    #             src_node = AG.Node(req,src_dev)
-    #             dst_node = AG.Node(gain,dst_dev)
-    #             e = AG.Edge(src_node,dst_node,vuln)
-    #             one_hop_paths.append(e)
-
-    #     list_combinations = []
-    #     for n in range(len(one_hop_paths) + 1):
-    #         list_combinations += list(itertools.combinations(one_hop_paths, n))
-
-    #     for comb in list_combinations:
-    #         if len(comb) > 0:
-    #             AttackPath = AG.AttackGraph([],[])
-    #             prev_edge = comb[0]
-    #             AttackPath.edges.append(prev_edge)
-    #             AttackPath.nodes.append(prev_edge.src)
-    #             AttackPath.nodes.append(prev_edge.dst)
-    #             for i in range(1,len(comb)):
-    #                 next_edge = comb[i]
-    #                 if prev_edge.dst.host['hostname'] == next_edge.src.host["hostname"]:
-    #                     if not AttackPath.check_if_edge_exist(next_edge):
-    #                         AttackPath.edges.append(next_edge)
-    #                     if not AttackPath.check_if_node_exist(next_edge.src):
-    #                         AttackPath.nodes.append(next_edge.src)
-    #                     if not AttackPath.check_if_node_exist(next_edge.dst):
-    #                         AttackPath.nodes.append(next_edge.dst)
-    #                 else:
-    #                     AttackPath = AG.AttackGraph([],[])
-    #                     break
-    #                 prev_edge = next_edge
-    #             print(len(comb), len(AttackPath.edges))
-    #             if len(AttackPath.edges) > 0:
-    #                 print(comb)
-    #                 AP = AG.AttackPath(AttackPath.nodes,AttackPath.edges)
-    #                 if AP.trace not in all_traces:
-    #                     all_paths.append(AP.get_features())
-    #                     all_traces.append(AP.trace)
-
-    #         with open(gt_paths_file, "w") as outfile:
-    #             json_data = json.dumps(all_paths, default=lambda o: o.__dict__, indent=2)
-    #             outfile.write(json_data)
-
-    #     count+=1
-    #     if count%10 == 0:
-    #         logging.info("[ITERATION] written progress %f of ground truth: %s", count/len(reach_paths), gt_paths_file)
-    
-    # logging.info("[CONCLUSION] generation of %s with %d paths.", gt_paths_file, len(all_paths))
-    # return len(all_paths)
 
 if __name__ == "__main__":
     """
