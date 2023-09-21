@@ -1,4 +1,4 @@
-import os, logging, json, random, csv, traceback, time
+import os, logging, json, random, csv, traceback, time, statistics
 import networkx as nx
 from pebble import ProcessPool
 
@@ -74,12 +74,15 @@ def run_experiment(params):
     collision_condition_other=0
     collision_condition_query=0
     isSteering=False
+    stopSteering=False
     steering_vulnerabilities=[]
     count_iteration=0
     sampled_vulnerabilities=[]
     start_generation = time.perf_counter()
+    track_precisions=[]
     try:
-        while(collision_condition_query<=0.9 and collision_condition_other<=0.8):
+        while(collision_condition_query<=0.9 or collision_condition_other<=0.9):
+        # while((collision_condition_query<=0.995 or steer_type=="steering") and (collision_condition_query<=0.98 or collision_condition_other<=0.98 or steer_type=="none")):
         # while((collision_condition_other+collision_condition_query)/2<=0.8):
             count_iteration+=1
             sampled_paths = sample_paths_reachability(RG,rg_nodes,config.num_samples,sampling_method)
@@ -104,13 +107,24 @@ def run_experiment(params):
             collision_condition_query = sum(collisions_query[-cc:])/cc
             collision_condition_other = sum(collisions_other[-cc:])/cc
             
-            if collision_condition_query >= config.start_steering_collision: isSteering=True
+            current_precision = len(attack_paths_query)/config.num_samples
+            track_precisions.append(current_precision)
+
+            if collision_condition_query >= config.start_steering_collision and steer_type=="steering": isSteering=True
             start_steering = time.perf_counter()
-            if isSteering and steer_type=="steering":
+            if isSteering and steer_type=="steering" and not stopSteering:
                 steering_vulnerabilities=steering.get_steering_vulns(filename_sample_query,filename_sample_other,vulnerabilities)
+                stopSteering=True
+
+                median_precision = statistics.median(track_precisions[-config.precision_window:]) #sum(track_precisions[-config.precision_window:])/config.precision_window
+                if median_precision >= current_precision:
+                    stopSteering=False
+                    print("restart steering at iteration: ", count_iteration)
+                    logging.info("[RESTART STEERING] of setting %s experiment %d steering %s at iteration %d",
+                            subfolder,num_exp,steer_type,count_iteration)
+                    print(current_precision, track_precisions[-config.precision_window:])
             
             if steer_type=="none":
-                print(len(sampled_vulnerabilities))         
                 distro_sampled_vuln = fm.base_features_distro(sampled_vulnerabilities)
                 stats_compare_vuln = fm.compare_stats(GT_base_stats, distro_sampled_vuln)
 
@@ -137,7 +151,7 @@ def run_experiment(params):
             if count_iteration%25 == 0: 
                 logging.info("Iteration %d of setting %s experiment %d steering %s: collision query %f, collision other %f",
                              count_iteration,subfolder,num_exp,steer_type,collision_condition_query,collision_condition_other)
-        logging.info("[END] folder %s, experiment %d, sampling: %s, steering: %s", subfolder,num_exp,sampling_method,steer_type)
+        logging.info("[END] folder %s, experiment %d, sampling: %s, steering: %s, collisions (query,other): %f - %f", subfolder,num_exp,sampling_method,steer_type,collision_condition_query,collision_condition_other)
     except Exception as e:
         traceback.print_exc()
         logging.error("[ERROR] %s on experiment %s, sampling: %s, steering: %s", e,subfolder,sampling_method,steer_type)

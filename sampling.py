@@ -1,20 +1,30 @@
 import os, json
 import walker
 import networkx as nx
+import csrgraph as cg
+import numpy as np
+import random
+
+def random_sampling(G,start_node,len_paths):
+    
+    path = [start_node]
+    for _ in range(len_paths - 1):
+        neighbors = list(G.neighbors(path[-1]))
+        if not neighbors:
+            break  # Stop if there are no more neighbors
+        next_node = random.choice(neighbors)
+        path.append(next_node)
+
+    edges_path = []
+    for i in range(1,len(path)):
+        edges_path.append((path[i-1],path[i]))
+    return list(dict.fromkeys(edges_path))
 
 def DFSampling(G,start_node,len_paths):
     return list(dict.fromkeys(nx.dfs_edges(G, source=start_node, depth_limit=len_paths)))
 
 def BFSampling(G,start_node,len_paths):
     return list(dict.fromkeys(nx.bfs_edges(G, source=start_node, depth_limit=len_paths)))
-
-def random_sampling(G,start_node,len_paths):
-    ordered_nodes = walker.random_walks(G, n_walks=1, walk_len=len_paths+1, 
-                    start_nodes=[start_node],verbose=False)[0]
-    edges_path = []
-    for i in range(1,len(ordered_nodes)):
-        edges_path.append((ordered_nodes[i-1],ordered_nodes[i]))
-    return list(dict.fromkeys(edges_path))
 
 def commit_paths_to_file(attack_paths,filename,iteration):
     existing_ids=[]

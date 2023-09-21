@@ -1,9 +1,9 @@
-import json, itertools, os, logging
+import json, itertools, os, logging, traceback, hashlib
 import networkx as nx
 from pebble import ProcessPool
 
 from models import AttackGraph as AG
-from attack_paths import retrieve_privileges, get_vulns_by_hostname
+from attack_paths import retrieve_privileges, get_vulns_by_hostname, get_derivative_features
 import config
 
 """
@@ -34,6 +34,44 @@ def build_reachability_graph(edges_reachability, devices):
         G.add_edge(edge_r["host_link"][0],edge_r["host_link"][1],vulns=cve_list_dst)
     return G
 
+def reachability_to_attack(reachability_path,devices,vulnerabilities,path_vulns):
+    processed_targets={}
+    trace = ""
+    impacts=[]
+    likelihoods=[]
+
+    counter_edge=0
+    for edge in reachability_path:
+        target_hostname = edge[1]
+        # if target_hostname not in processed_targets.keys():
+        #     vulns_edge = get_vulns_by_hostname(target_hostname,devices)
+        #     processed_targets[target_hostname] = vulns_edge
+        # else:
+        #     vulns_edge = processed_targets[target_hostname]
+        # if len(vulns_edge)<=0: continue
+        
+        # for attack_vuln in vulns_edge:
+        attack_vuln = path_vulns[counter_edge]
+        vuln,pre,post = retrieve_privileges(attack_vuln,vulnerabilities)
+        src=pre+"@"+str(edge[0])
+        dst=post+"@"+str(target_hostname)
+
+        if edge == reachability_path[-1]: trace += src+"#"+attack_vuln+"#"+dst
+        else: trace += src+"#"+attack_vuln+"#"+dst+"##"
+
+        impact,likelihood=get_derivative_features(vuln)
+        impacts.append(impact)
+        likelihoods.append(likelihood)
+        counter_edge+=1
+
+    return {
+        "id": hashlib.sha256(str(trace).encode("utf-8")).hexdigest(),
+        "trace": trace,
+        "length": len(impacts),
+        "impact": sum(impacts)/len(impacts),
+        "likelihood": sum(likelihoods)/len(likelihoods),
+    }
+
 """
 This function generate all the attack paths (ground truth) for a given network
 """
@@ -46,7 +84,6 @@ def generate_all_paths(subfolder):
         logging.warning("Ground Truth %s already GENERATED.", gt_paths_file)
         return
     
-    logging.info("[START] generation of ground truth: %s", gt_paths_file)
 
     with open(network_file) as net_f:
             file_content = json.load(net_f)
@@ -57,66 +94,110 @@ def generate_all_paths(subfolder):
     G = build_reachability_graph(edges_reachability, devices)
     vulns = nx.get_edge_attributes(G,'vulns')
 
-    permutations = list(itertools.permutations(G.nodes(), 2))
-    reach_paths = []
-    for couple in permutations:
-        src = couple[0]
-        dst = couple[1]
-        curr_paths = nx.all_simple_edge_paths(G, source=src, target=dst)
-        for p in curr_paths:
-            reach_paths.append(p)
-    
-    all_paths=[]
-    all_traces=[]
-    for path in reach_paths:
-        one_hop_paths = []
-        for edge in path:
-            for v in vulns[edge]:
-                vuln,req,gain = retrieve_privileges(v,vulnerabilities)            
-                for dev in devices:
-                    if dev["hostname"] == edge[1]: dst_dev = dev
-                    elif dev["hostname"] == edge[0]: src_dev = dev
-                src_node = AG.Node(req,src_dev)
-                dst_node = AG.Node(gain,dst_dev)
-                e = AG.Edge(src_node,dst_node,vuln)
-                one_hop_paths.append(e)
+    logging.info("[START] generation of ground truth %s", gt_paths_file)
 
-        list_combinations = []
-        for n in range(len(one_hop_paths) + 1):
-            list_combinations += list(itertools.combinations(one_hop_paths, n))
+    try:
+        for src in G.nodes:
+            for dst in G.nodes:
+                # if src != dst:
+                attack_paths=[]
+                for p in nx.all_simple_edge_paths(G,src,dst):
+                    vulns_combination = []
+                    for edge in p:
+                        vulns_combination.append(vulns[edge])
+                    all_comb = list(itertools.product(*vulns_combination))
+                    for combination in all_comb:
+                        AP = reachability_to_attack(p,devices,vulnerabilities,combination)
+                        attack_paths.append(AP)
 
-        for comb in list_combinations:
-            if len(comb) > 0:
-                AttackPath = AG.AttackGraph([],[])
-                prev_edge = comb[0]
-                AttackPath.edges.append(prev_edge)
-                AttackPath.nodes.append(prev_edge.src)
-                AttackPath.nodes.append(prev_edge.dst)
-                for i in range(1,len(comb)):
-                    next_edge = comb[i]
-                    if prev_edge.dst.host['hostname'] == next_edge.src.host["hostname"]:
-                        if not AttackPath.check_if_edge_exist(next_edge):
-                            AttackPath.edges.append(next_edge)
-                        if not AttackPath.check_if_node_exist(next_edge.src):
-                            AttackPath.nodes.append(next_edge.src)
-                        if not AttackPath.check_if_node_exist(next_edge.dst):
-                            AttackPath.nodes.append(next_edge.dst)
-                    else:
-                        AttackPath = AG.AttackGraph([],[])
-                        break
-                    prev_edge = next_edge
-                if len(AttackPath.edges) > 0:
-                    AP = AG.AttackPath(AttackPath.nodes,AttackPath.edges)
-                    if AP.trace not in all_traces:
-                        all_paths.append(AP.get_features())
-                        all_traces.append(AP.trace)
-        
-    with open(gt_paths_file, "w") as outfile:
-        json_data = json.dumps(all_paths, default=lambda o: o.__dict__, indent=2)
-        outfile.write(json_data)
+                existing_paths=[]
+                if os.path.exists(gt_paths_file):
+                    with open(gt_paths_file) as f: existing_paths = json.load(f)
+                
+                with open(gt_paths_file, "w") as outfile:
+                    json_data = json.dumps(existing_paths+attack_paths, default=lambda o: o.__dict__, indent=2)
+                    outfile.write(json_data)
+                    
+                logging.info("[ITERATION] file %s paths from source %d to dst %d computed: %d", gt_paths_file, src,dst, len(existing_paths+attack_paths))
+
+        logging.info("[CONCLUSION] generation of %s with %d paths.", gt_paths_file, len(existing_paths+attack_paths))
     
-    logging.info("[CONCLUSION] generation of %s with %d paths.", gt_paths_file, len(all_paths))
-    return len(all_paths)
+    except Exception as e:
+        traceback.print_exc()
+        logging.error("[ERROR] %s on %s", e,gt_paths_file)
+    
+    return len(existing_paths+attack_paths)
+
+
+    # permutations = list(itertools.permutations(G.nodes(), 2))
+    # reach_paths = []
+    # for couple in permutations:
+    #     src = couple[0]
+    #     dst = couple[1]
+    #     curr_paths = nx.all_simple_edge_paths(G, source=src, target=dst)
+    #     for p in curr_paths:
+    #         reach_paths.append(p)
+    
+    # logging.info("[START] generation of ground truth: %s with %d reachability paths.", gt_paths_file, len(reach_paths))
+    
+    # all_paths=[]
+    # all_traces=[]
+    # count=0
+    # for path in reach_paths:
+    #     one_hop_paths = []
+    #     for edge in path:
+    #         for v in vulns[edge]:
+    #             vuln,req,gain = retrieve_privileges(v,vulnerabilities)            
+    #             for dev in devices:
+    #                 if dev["hostname"] == edge[1]: dst_dev = dev
+    #                 elif dev["hostname"] == edge[0]: src_dev = dev
+    #             src_node = AG.Node(req,src_dev)
+    #             dst_node = AG.Node(gain,dst_dev)
+    #             e = AG.Edge(src_node,dst_node,vuln)
+    #             one_hop_paths.append(e)
+
+    #     list_combinations = []
+    #     for n in range(len(one_hop_paths) + 1):
+    #         list_combinations += list(itertools.combinations(one_hop_paths, n))
+
+    #     for comb in list_combinations:
+    #         if len(comb) > 0:
+    #             AttackPath = AG.AttackGraph([],[])
+    #             prev_edge = comb[0]
+    #             AttackPath.edges.append(prev_edge)
+    #             AttackPath.nodes.append(prev_edge.src)
+    #             AttackPath.nodes.append(prev_edge.dst)
+    #             for i in range(1,len(comb)):
+    #                 next_edge = comb[i]
+    #                 if prev_edge.dst.host['hostname'] == next_edge.src.host["hostname"]:
+    #                     if not AttackPath.check_if_edge_exist(next_edge):
+    #                         AttackPath.edges.append(next_edge)
+    #                     if not AttackPath.check_if_node_exist(next_edge.src):
+    #                         AttackPath.nodes.append(next_edge.src)
+    #                     if not AttackPath.check_if_node_exist(next_edge.dst):
+    #                         AttackPath.nodes.append(next_edge.dst)
+    #                 else:
+    #                     AttackPath = AG.AttackGraph([],[])
+    #                     break
+    #                 prev_edge = next_edge
+    #             print(len(comb), len(AttackPath.edges))
+    #             if len(AttackPath.edges) > 0:
+    #                 print(comb)
+    #                 AP = AG.AttackPath(AttackPath.nodes,AttackPath.edges)
+    #                 if AP.trace not in all_traces:
+    #                     all_paths.append(AP.get_features())
+    #                     all_traces.append(AP.trace)
+
+    #         with open(gt_paths_file, "w") as outfile:
+    #             json_data = json.dumps(all_paths, default=lambda o: o.__dict__, indent=2)
+    #             outfile.write(json_data)
+
+    #     count+=1
+    #     if count%10 == 0:
+    #         logging.info("[ITERATION] written progress %f of ground truth: %s", count/len(reach_paths), gt_paths_file)
+    
+    # logging.info("[CONCLUSION] generation of %s with %d paths.", gt_paths_file, len(all_paths))
+    # return len(all_paths)
 
 if __name__ == "__main__":
     """

@@ -231,9 +231,9 @@ def clean_benchmark(folder):
             continue
         
 def build_dataset(clean_data=False):
-    if clean_data: clean_benchmark(config.ROOT_FOLDER)
-
     if not os.path.exists(config.ROOT_FOLDER): os.makedirs(config.ROOT_FOLDER)
+
+    if clean_data: clean_benchmark(config.ROOT_FOLDER)
     generated_files = os.listdir(config.ROOT_FOLDER)
     
     for n in config.nhosts:
@@ -263,6 +263,47 @@ def build_dataset(clean_data=False):
                             if not os.path.exists(folder_name_sample): os.mkdir(folder_name_sample)
                             
                             for exp in range(1,config.num_experiments+1):
+                                experiment_folder = folder_name_sample+'exp'+str(exp)+"/"
+                                if not os.path.exists(experiment_folder): os.mkdir(experiment_folder)
+                    
+                                stat_folder = experiment_folder+config.stat_folder
+                                samples_folder = experiment_folder+config.samples_folder
+                                if not os.path.exists(stat_folder): os.mkdir(stat_folder)
+                                if not os.path.exists(samples_folder): os.mkdir(samples_folder)
+
+def build_dataset_performance(clean_data=False):
+    if not os.path.exists(config.ROOT_FOLDER_PERFORMANCE): os.makedirs(config.ROOT_FOLDER_PERFORMANCE)
+
+    if clean_data: clean_benchmark(config.ROOT_FOLDER_PERFORMANCE)
+    generated_files = os.listdir(config.ROOT_FOLDER_PERFORMANCE)
+    
+    for n in config.nhosts_per:
+        for v in config.nvulns_per:
+            for t in config.topologies_per:
+                for d in config.distro_per:
+                    for u in config.diversity_per:
+                        base_name = str(n)+'_'+str(v)+'_'+t+'_'+d+'_'+str(u)
+                        folder_name = config.ROOT_FOLDER_PERFORMANCE+base_name+"/"
+                        if not os.path.exists(folder_name): os.makedirs(folder_name)
+
+                        gt_folder = folder_name+config.gt_folder
+                        if not os.path.exists(gt_folder): os.mkdir(gt_folder)
+
+                        if base_name not in generated_files:
+                            correct_filename = build_reachability(gt_folder,base_name+".json")
+                            correct_folder = config.ROOT_FOLDER_PERFORMANCE+correct_filename.split(".json")[0]+"/"
+                            if correct_folder != folder_name:
+                                os.rename(folder_name, correct_folder)
+                                folder_name = correct_folder
+                            
+                        # plot_folder = folder_name+config.plot_folder
+                        # if not os.path.exists(plot_folder): os.mkdir(plot_folder)
+
+                        for sampling in config.sampling_algorithms:
+                            folder_name_sample=folder_name+sampling+"/"
+                            if not os.path.exists(folder_name_sample): os.mkdir(folder_name_sample)
+                            
+                            for exp in range(1,config.num_experiments_per+1):
                                 experiment_folder = folder_name_sample+'exp'+str(exp)+"/"
                                 if not os.path.exists(experiment_folder): os.mkdir(experiment_folder)
                     

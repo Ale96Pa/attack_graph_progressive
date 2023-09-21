@@ -2,9 +2,63 @@ import os, json
 import pandas as pd
 from scipy import stats
 import matplotlib.pyplot as plt
+pd.options.mode.chained_assignment = None
 
+from steering import isQuery
 import config
 
+def plot_time_steering(folder,df_experiments,param_time,sampling_algo=""):
+    plt.rcParams.update({'font.size': 24})
+    fig, axs = plt.subplots()
+    fig.set_figwidth(15)
+    fig.set_figheight(10)
+
+    df_experiments = df_experiments[df_experiments.steering_type == "steering"]
+
+    if param_time == "time_generation":
+        df_experiments['time_generation'] = df_experiments['time_generation'].diff()
+        x = df_experiments["iteration"][:-1]
+        y = df_experiments["time_generation"][:-1]
+    else:
+        x = df_experiments["iteration"]
+        y = df_experiments["time_steering"]
+    plt.bar(x, y)
+    plt.xlabel("iterations")
+    plt.ylabel(param_time+" (s)")
+    plt.savefig(folder+config.plot_folder+sampling_algo+"_"+param_time+".png", bbox_inches='tight')
+
+
+def plot_lines_steering_all(folder,df_experiments,sampling_algo=""):
+    plt.rcParams.update({'font.size': 24})
+    fig, axs = plt.subplots()
+    fig.set_figwidth(15)
+    fig.set_figheight(10)
+
+    if "isSteering" in df_experiments.columns:
+        index_steering = list(df_experiments[df_experiments.isSteering == True]["iteration"])
+        if len(index_steering)>0:
+            print("Iteration where steering started: ", index_steering[0])
+    
+    tot_paths = max(list(df_experiments["num_query_paths"]))#+max(list(sample_df["num_other_paths"]))
+    df_experiments = df_experiments[df_experiments.steering_type == "steering"]
+    grouped_by_sample = df_experiments.groupby(['experiment'])
+    labels_legend = []
+    for sample, item in grouped_by_sample:
+        sample_df = grouped_by_sample.get_group(sample)
+
+        x_vals = sample_df["iteration"]
+        y_vals_0 = sample_df["num_query_paths"]/tot_paths
+
+        labels_legend.append(sample)
+        axs.plot(x_vals,y_vals_0,linewidth = '3')
+    
+    axs.set_xlabel("iterations")
+    axs.set_ylabel("% query paths")
+    axs.legend(title="Experiments", labels=labels_legend)
+    axs.set_title("Percentage of Queried Paths to total")
+
+    plt.savefig(folder+config.plot_folder+sampling_algo+"_steering_ALL.png", bbox_inches='tight')
+    
 def plot_lines_steering(folder,df_experiments,sampling_algo=""):
     plt.rcParams.update({'font.size': 24})
     fig, axs = plt.subplots()
@@ -31,6 +85,7 @@ def plot_lines_steering(folder,df_experiments,sampling_algo=""):
     
     axs.set_xlabel("iterations")
     axs.set_ylabel("% query paths")
+    axs.set_ylim(0,1)
     axs.legend(title="Steering", labels=labels_legend)
     axs.set_title("Percentage of Queried Paths to total")
 
@@ -108,64 +163,270 @@ def plot_delta_variation(folder,df_aggregate,sampling_algo=""):
 
     # return x_vals_len,x_vals_imp,x_vals_lik
 
-def plot_distance_boxplot(folder,dfs,gt_file,sampling_algo=""):
-    plt.rcParams.update({'font.size': 18})
+def plot_delta_distribution(folder,df_exps,sampling_algo="",absoluteScale=False):
+    plt.rcParams.update({'font.size': 22})
     fig, axs = plt.subplots(3, 1)
-    fig.set_figwidth(20)
-    fig.set_figheight(15)
+    fig.set_figwidth(15)
+    fig.set_figheight(20)
+
+    labels_legend=[]
+    grouped_by_experiment = df_exps.groupby(["experiment"])
+    for sample, item in grouped_by_experiment:
+        # sample_df = grouped_by_sample.get_group(sample)
+        y_len=[]
+        y_imp=[]
+        y_lik=[]
+        x_iterations=[]
+        prev_len_distro=[]
+        prev_imp_distro=[]
+        prev_lik_distro=[]
+        for iter in list(set(item["iteration"])):
+            current_len_distro = list(item[item.iteration == iter]["length"])+prev_len_distro
+            current_imp_distro = list(item[item.iteration == iter]["impact"])+prev_imp_distro
+            current_lik_distro = list(item[item.iteration == iter]["likelihood"])+prev_lik_distro
+            
+            if len(prev_len_distro)>1:
+                res_len = stats.ks_2samp(prev_len_distro,current_len_distro)
+                res_imp = stats.ks_2samp(prev_imp_distro,current_imp_distro)
+                res_lik = stats.ks_2samp(prev_lik_distro,current_lik_distro)
+
+                y_len.append(res_len.statistic)
+                y_imp.append(res_imp.statistic)
+                y_lik.append(res_lik.statistic)
+
+                x_iterations.append(iter)
+
+            prev_len_distro=current_len_distro
+            prev_imp_distro=current_imp_distro
+            prev_lik_distro=current_lik_distro
+        
+        axs[0].plot(x_iterations, y_len, linewidth = '2')
+        axs[1].plot(x_iterations, y_imp, linewidth = '2')
+        axs[2].plot(x_iterations, y_lik, linewidth = '2')
+        labels_legend.append(sample)
+    
+    axs[0].legend(title="Experiments", labels=labels_legend)
+    axs[0].set_ylabel("K-S distance (current,previous)")
+    axs[0].set_title("length", y=1.0, pad=-20)
+
+    axs[1].set_ylabel("K-S distance (current,previous)")
+    axs[1].set_title("impact", y=1.0, pad=-20)
+
+    axs[2].set_xlabel("iteration")
+    axs[2].set_ylabel("K-S distance (current,previous)")
+    axs[2].set_title("likelihood", y=1.0, pad=-20)
+
+    if absoluteScale:
+        axs[0].set_ylim(0,1)
+        axs[1].set_ylim(0,1)
+        axs[2].set_ylim(0,1)
+
+    plt.savefig(folder+config.plot_folder+sampling_algo+"_deltaDistro.png", bbox_inches='tight')
+
+def plot_delta_distribution_aggr(folder,df_exps,sampling_algo="",absoluteScale=False):
+    plt.rcParams.update({'font.size': 22})
+    fig, axs = plt.subplots(3, 1)
+    fig.set_figwidth(15)
+    fig.set_figheight(20)
+
+    labels_legend=[]
+    grouped_by_experiment = df_exps.groupby(["iteration"])
+    y_len=[]
+    y_imp=[]
+    y_lik=[]
+    x_iterations=[]
+    prev_len_distro=[]
+    prev_imp_distro=[]
+    prev_lik_distro=[]
+    for sample, item in grouped_by_experiment:
+        # sample_df = grouped_by_sample.get_group(sample)
+
+        current_len_distro = list(item["length"])+prev_len_distro
+        current_imp_distro = list(item["impact"])+prev_imp_distro
+        current_lik_distro = list(item["likelihood"])+prev_lik_distro
+        
+        if len(prev_len_distro)>1:
+            res_len = stats.ks_2samp(prev_len_distro,current_len_distro)
+            res_imp = stats.ks_2samp(prev_imp_distro,current_imp_distro)
+            res_lik = stats.ks_2samp(prev_lik_distro,current_lik_distro)
+
+            y_len.append(res_len.statistic)
+            y_imp.append(res_imp.statistic)
+            y_lik.append(res_lik.statistic)
+
+            x_iterations.append(sample)
+
+        prev_len_distro=current_len_distro
+        prev_imp_distro=current_imp_distro
+        prev_lik_distro=current_lik_distro
+        
+        labels_legend.append(sample)
+        # print(sample, len(current_len_distro))
+    
+    axs[0].plot(x_iterations, y_len, linewidth = '2')
+    axs[1].plot(x_iterations, y_imp, linewidth = '2')
+    axs[2].plot(x_iterations, y_lik, linewidth = '2')
+    
+    axs[0].set_ylabel("K-S distance (current,previous)")
+    axs[0].set_title("length", y=1.0, pad=-20)
+
+    axs[1].set_ylabel("K-S distance (current,previous)")
+    axs[1].set_title("impact", y=1.0, pad=-20)
+
+    axs[2].set_xlabel("iteration")
+    axs[2].set_ylabel("K-S distance (current,previous)")
+    axs[2].set_title("likelihood", y=1.0, pad=-20)
+
+    if absoluteScale:
+        axs[0].set_ylim(0,1)
+        axs[1].set_ylim(0,1)
+        axs[2].set_ylim(0,1)
+
+    plt.savefig(folder+config.plot_folder+sampling_algo+"_deltaDistroAggregated.png", bbox_inches='tight')
+
+# def plot_distance_boxplot(folder,dfs,gt_file,sampling_algo=""):
+#     plt.rcParams.update({'font.size': 18})
+#     fig, axs = plt.subplots(3, 1)
+#     fig.set_figwidth(20)
+#     fig.set_figheight(15)
+
+#     with open(gt_file) as f: gt_paths = json.load(f)
+#     df_gt = pd.DataFrame(gt_paths)
+#     gt_len=list(df_gt["length"])
+#     gt_imp=list(df_gt["impact"])
+#     gt_lik=list(df_gt["likelihood"])
+
+#     dict_sampled_len = {}
+#     dict_sampled_imp = {}
+#     dict_sampled_lik = {}
+#     s_len=[]
+#     s_imp=[]
+#     s_lik=[]
+    
+#     for df_samples in dfs:
+#         grouped_by_sample = df_samples.groupby(["iteration"])
+
+#         for sample, item in grouped_by_sample:
+#             sample_df = grouped_by_sample.get_group(sample)
+#             sampled_len = []
+#             sampled_imp = []
+#             sampled_lik = []
+
+#             s_len+=list(sample_df["length"])
+#             s_imp+=list(sample_df["impact"])
+#             s_lik+=list(sample_df["likelihood"])
+            
+#             res_len = stats.ks_2samp(gt_len,s_len)
+#             res_imp = stats.ks_2samp(gt_imp,s_imp)
+#             res_lik = stats.ks_2samp(gt_lik,s_lik)
+            
+#             sampled_len.append(res_len.statistic)
+#             sampled_imp.append(res_imp.statistic)
+#             sampled_lik.append(res_lik.statistic)
+            
+#             if sample in dict_sampled_len.keys(): dict_sampled_len[sample]+=sampled_len
+#             else: dict_sampled_len[sample] = sampled_len
+
+#             if sample in dict_sampled_imp.keys(): dict_sampled_imp[sample]+=sampled_imp
+#             else: dict_sampled_imp[sample] = sampled_imp
+
+#             if sample in dict_sampled_lik.keys(): dict_sampled_lik[sample]+=sampled_lik
+#             else: dict_sampled_lik[sample] = sampled_lik
+    
+#     dict_sampled_len = dict(sorted(dict_sampled_len.items()))
+#     dict_sampled_imp = dict(sorted(dict_sampled_imp.items()))
+#     dict_sampled_lik = dict(sorted(dict_sampled_lik.items()))
+#     len_vals=[]
+#     len_k=[]
+#     imp_vals=[]
+#     imp_k=[]
+#     lik_vals=[]
+#     lik_k=[]
+#     for i in range(0,len(dict_sampled_len.values())):
+#         if i%28==0:
+#             len_vals.append(list(dict_sampled_len.values())[i])
+#             len_k.append(list(dict_sampled_len.keys())[i])
+#             imp_vals.append(list(dict_sampled_imp.values())[i])
+#             imp_k.append(list(dict_sampled_imp.keys())[i])
+#             lik_vals.append(list(dict_sampled_lik.values())[i])
+#             lik_k.append(list(dict_sampled_lik.keys())[i])
+    
+#     axs[0].boxplot(len_vals)
+#     axs[0].set_xticklabels(len_k, rotation = 90)
+#     axs[0].set_ylim(0,1)
+#     axs[0].set_title("length", y=1.0, pad=-20)
+
+#     axs[1].boxplot(imp_vals)
+#     axs[1].set_xticklabels(imp_k, rotation = 90)
+#     axs[1].set_ylim(0,1)
+#     axs[1].set_title("impact", y=1.0, pad=-20)
+
+#     axs[2].boxplot(lik_vals)
+#     axs[2].set_xticklabels(lik_k, rotation = 90)
+#     axs[2].set_ylim(0,1)
+#     axs[2].set_title("likelihood", y=1.0, pad=-20)
+
+#     # dict_sampled_len = dict(sorted(dict_sampled_len.items()))
+#     # axs[0].boxplot(dict_sampled_len.values())
+#     # axs[0].set_xticklabels(dict_sampled_len.keys(), rotation = 90)
+#     # axs[0].set_title("length", y=1.0, pad=-20)
+
+#     # dict_sampled_imp = dict(sorted(dict_sampled_imp.items()))
+#     # axs[1].boxplot(dict_sampled_imp.values())
+#     # axs[1].set_xticklabels(dict_sampled_imp.keys(), rotation = 90)
+#     # axs[1].set_title("impact", y=1.0, pad=-20)
+
+#     # dict_sampled_lik = dict(sorted(dict_sampled_lik.items()))
+#     # axs[2].boxplot(dict_sampled_lik.values())
+#     # axs[2].set_xticklabels(dict_sampled_lik.keys(), rotation = 90)
+#     # axs[2].set_title("likelihood", y=1.0, pad=-20)
+
+#     plt.savefig(folder+config.plot_folder+sampling_algo+"_distanceBoxplot.png", bbox_inches='tight')
+def plot_distance_boxplot(folder,df_exps,gt_file,sampling_algo=""):
+    plt.rcParams.update({'font.size': 22})
+    fig, axs = plt.subplots(3, 1)
+    fig.set_figwidth(15)
+    fig.set_figheight(20)
 
     with open(gt_file) as f: gt_paths = json.load(f)
     df_gt = pd.DataFrame(gt_paths)
     gt_len=list(df_gt["length"])
-    gt_len.sort()
     gt_imp=list(df_gt["impact"])
-    gt_imp.sort()
     gt_lik=list(df_gt["likelihood"])
-    gt_lik.sort()
 
-    dict_sampled_len = {}
-    dict_sampled_imp = {}
-    dict_sampled_lik = {}
-    s_len=[]
-    s_imp=[]
-    s_lik=[]
-    
-    for df_samples in dfs:
-        grouped_by_sample = df_samples.groupby(["iteration"])
+    clean_df_exps = pd.merge(df_exps, df_gt, how='inner', on=['id','trace','length','impact','likelihood'])
+    grouped_by_experiment = clean_df_exps.groupby(["experiment"])
+    dict_ks_len={}
+    dict_ks_imp={}
+    dict_ks_lik={}
+    for exp_id, df_single_exp in grouped_by_experiment:
+        grouped_by_iteration = df_single_exp.groupby(["iteration"])
 
-        for sample, item in grouped_by_sample:
-            sample_df = grouped_by_sample.get_group(sample)
-            sampled_len = []
-            sampled_imp = []
-            sampled_lik = []
-
-            s_len+=list(sample_df["length"])
-            s_len.sort()
-            s_imp+=list(sample_df["impact"])
-            s_imp.sort()
-            s_lik+=list(sample_df["likelihood"])
-            s_lik.sort()
+        s_len=[]
+        s_imp=[]
+        s_lik=[]
+        for iter_id, df_iter in grouped_by_iteration:
+            
+            s_len+=list(df_iter["length"])
+            s_imp+=list(df_iter["impact"])
+            s_lik+=list(df_iter["likelihood"])
             
             res_len = stats.ks_2samp(gt_len,s_len)
             res_imp = stats.ks_2samp(gt_imp,s_imp)
             res_lik = stats.ks_2samp(gt_lik,s_lik)
-            
-            sampled_len.append(res_len.statistic)
-            sampled_imp.append(res_imp.statistic)
-            sampled_lik.append(res_lik.statistic)
-            
-            if sample in dict_sampled_len.keys(): dict_sampled_len[sample]+=sampled_len
-            else: dict_sampled_len[sample] = sampled_len
 
-            if sample in dict_sampled_imp.keys(): dict_sampled_imp[sample]+=sampled_imp
-            else: dict_sampled_imp[sample] = sampled_imp
+            if iter_id in dict_ks_len.keys(): dict_ks_len[iter_id].append(res_len.statistic)
+            else: dict_ks_len[iter_id] = [res_len.statistic]
 
-            if sample in dict_sampled_lik.keys(): dict_sampled_lik[sample]+=sampled_lik
-            else: dict_sampled_lik[sample] = sampled_lik
-    
-    dict_sampled_len = dict(sorted(dict_sampled_len.items()))
-    dict_sampled_imp = dict(sorted(dict_sampled_imp.items()))
-    dict_sampled_lik = dict(sorted(dict_sampled_lik.items()))
+            if iter_id in dict_ks_imp.keys(): dict_ks_imp[iter_id].append(res_imp.statistic)
+            else: dict_ks_imp[iter_id] = [res_imp.statistic]
+
+            if iter_id in dict_ks_lik.keys(): dict_ks_lik[iter_id].append(res_lik.statistic)
+            else: dict_ks_lik[iter_id] = [res_lik.statistic]
+            
+    dict_sampled_len = dict(sorted(dict_ks_len.items()))
+    dict_sampled_imp = dict(sorted(dict_ks_imp.items()))
+    dict_sampled_lik = dict(sorted(dict_ks_lik.items()))
     len_vals=[]
     len_k=[]
     imp_vals=[]
@@ -173,7 +434,7 @@ def plot_distance_boxplot(folder,dfs,gt_file,sampling_algo=""):
     lik_vals=[]
     lik_k=[]
     for i in range(0,len(dict_sampled_len.values())):
-        if i%5==0:
+        if i%28==0:
             len_vals.append(list(dict_sampled_len.values())[i])
             len_k.append(list(dict_sampled_len.keys())[i])
             imp_vals.append(list(dict_sampled_imp.values())[i])
@@ -183,32 +444,21 @@ def plot_distance_boxplot(folder,dfs,gt_file,sampling_algo=""):
     
     axs[0].boxplot(len_vals)
     axs[0].set_xticklabels(len_k, rotation = 90)
+    axs[0].set_ylim(0,1)
     axs[0].set_title("length", y=1.0, pad=-20)
 
     axs[1].boxplot(imp_vals)
     axs[1].set_xticklabels(imp_k, rotation = 90)
+    axs[1].set_ylim(0,1)
     axs[1].set_title("impact", y=1.0, pad=-20)
 
     axs[2].boxplot(lik_vals)
     axs[2].set_xticklabels(lik_k, rotation = 90)
+    axs[2].set_ylim(0,1)
     axs[2].set_title("likelihood", y=1.0, pad=-20)
 
-    # dict_sampled_len = dict(sorted(dict_sampled_len.items()))
-    # axs[0].boxplot(dict_sampled_len.values())
-    # axs[0].set_xticklabels(dict_sampled_len.keys(), rotation = 90)
-    # axs[0].set_title("length", y=1.0, pad=-20)
-
-    # dict_sampled_imp = dict(sorted(dict_sampled_imp.items()))
-    # axs[1].boxplot(dict_sampled_imp.values())
-    # axs[1].set_xticklabels(dict_sampled_imp.keys(), rotation = 90)
-    # axs[1].set_title("impact", y=1.0, pad=-20)
-
-    # dict_sampled_lik = dict(sorted(dict_sampled_lik.items()))
-    # axs[2].boxplot(dict_sampled_lik.values())
-    # axs[2].set_xticklabels(dict_sampled_lik.keys(), rotation = 90)
-    # axs[2].set_title("likelihood", y=1.0, pad=-20)
-
     plt.savefig(folder+config.plot_folder+sampling_algo+"_distanceBoxplot.png", bbox_inches='tight')
+    
 
 def plot_statistics_basefeatures(folder,df,sampling_algo,val="stat"):
     axesV2 = {'metricV2.accessVector':[0,0],
@@ -249,16 +499,18 @@ def plot_statistics_basefeatures(folder,df,sampling_algo,val="stat"):
             i,j = axes_map[parameter]
             ax = axs[i][j]
             
-            samples = df["iteration"]
-            values = df[parameter+"."+val]
-            # if parameter not in [sub.replace('.stat', '').replace('.pvalue', '') for sub in list(df.columns)]: 
-            #     print(parameter, "not present")
-            #     continue
-            
-            ax.plot(samples, values)
+            if parameter+"."+val in df.columns:
+                samples = df["iteration"]
+                values = df[parameter+"."+val]
+                # if parameter not in [sub.replace('.stat', '').replace('.pvalue', '') for sub in list(df.columns)]: 
+                #     print(parameter, "not present")
+                #     continue
+                
+                ax.plot(samples, values)
 
             label_title = parameter.replace("metricV2.","").replace("metricV3.","").replace(".stat","").replace(".pvalue","")
             ax.set_title(label_title, y=1.0, pad=-20)
+            ax.set_ylim(0,1)
             if i == 1: ax.set_xlabel("iteration")
             if j == 0:
                 if val == "stat": ax.set_ylabel("distance")
@@ -269,11 +521,11 @@ def plot_statistics_basefeatures(folder,df,sampling_algo,val="stat"):
 
 if __name__ == "__main__":
     experiment_settings={
-        'n': 10,
-        'v': 5,
-        't':"powerlaw",
-        'd':"uniform",
-        'u':0.5,
+        'n': config.nhosts[len(config.nhosts)-1],#10,
+        'v': config.nvulns[len(config.nvulns)-1],#10,
+        't': config.topologies[len(config.topologies)-1],#"powerlaw",
+        'd': config.distro[len(config.distro)-1],#"uniform",
+        'u': config.diversity[len(config.diversity)-1],#1,
         's':"random"
     }
 
@@ -297,7 +549,7 @@ if __name__ == "__main__":
                                         """
                                         SAMPLING
                                         """
-                                        GT_path_file = folder_name+config.gt_paths
+                                        if os.path.exists(folder_name+config.gt_paths): GT_path_file = folder_name+config.gt_paths
 
                                         filename_sample_other = folder_name+samplingType+\
                                                     "/exp"+str(exp)+config.get_samples_filename("none")
@@ -308,7 +560,8 @@ if __name__ == "__main__":
                                         
                                         df_exp_sample = convert_samples_to_df(filename_sample_other, filename_sample_query)
                                         num_iteration_sampling.append(max(list(df_exp_sample["iteration"])))
-                                        
+                                        df_exp_sample["experiment"]=exp
+
                                         if samplingType not in df_samples.keys(): df_samples[samplingType] = [df_exp_sample]
                                         else: df_samples[samplingType].append(df_exp_sample)
 
@@ -324,6 +577,7 @@ if __name__ == "__main__":
                                         df_experiment = pd.read_csv(filename_steering_stats)
                                         # plot_lines_steering(folder_name+samplingType+"/",df_experiment)
 
+                                        df_experiment["experiment"]=exp
                                         if samplingType not in df_steers.keys(): df_steers[samplingType] = [df_experiment]
                                         else: df_steers[samplingType].append(df_experiment)
     
@@ -342,14 +596,51 @@ if __name__ == "__main__":
         #     d = df_cut[df_cut["iteration"]<=avg_iteration]
         #     list_dfcut.append(d)
         df_sampling_derivative = pd.concat(df_samples[k])
+        plot_delta_distribution("",df_sampling_derivative,k)
+        plot_delta_distribution_aggr("",df_sampling_derivative,k)
+        
         averages_samples = df_sampling_derivative.groupby(['iteration']).median().reset_index()
         averages_samples.to_csv(config.plot_folder+"/avg_samples.csv",index=False)
         plot_delta_variation("",averages_samples,k)
     
-        if GT_path_file!="": plot_distance_boxplot("",df_samples[k],GT_path_file,k)
+        if GT_path_file!="": 
+            # plot_distance_boxplot("",df_samples[k],GT_path_file,k)
+            plot_distance_boxplot("",df_sampling_derivative,GT_path_file,k)
 
     for k in df_steers.keys():
         df_sampling = pd.concat(df_steers[k])
+
         averages_stats = df_sampling.groupby(['iteration','num_samples','steering_type']).median().reset_index()
         averages_stats.to_csv(config.plot_folder+"/avg_stats.csv",index=False)
+        plot_time_steering("",averages_stats,"time_steering",k)
+        plot_time_steering("",averages_stats,"time_generation",k)
+    max_iteration=max(list(df_sampling[df_sampling.steering_type == "steering"]["iteration"]))
+    
+    for k in df_steers.keys():
+        list_df_extended = []
+        for df_curr in df_steers[k]:
+            curr_max_iteration = max(list(df_curr[df_curr.steering_type == "steering"]["iteration"]))
+            copy_row = df_curr[(df_curr.steering_type == "steering") & (df_curr.iteration == curr_max_iteration)]
+            for i in range(curr_max_iteration,max_iteration):
+                copy_row["iteration"] = i
+                df_curr = df_curr.append(copy_row, ignore_index=True)
+            list_df_extended.append(df_curr)
+        df_sampling = pd.concat(list_df_extended)
+
+        plot_lines_steering_all("",df_sampling,k)
+
+        averages_stats = df_sampling.groupby(['iteration','num_samples','steering_type']).median().reset_index()
+        # averages_stats.to_csv(config.plot_folder+"/avg_stats.csv",index=False)
         plot_lines_steering("",averages_stats,k)
+
+
+    QUERY = {
+        # 'length': [2,4],
+        'impact': [1,5],
+        'likelihood': [0,4]
+    }
+    with open(GT_path_file) as f: gt_paths = json.load(f)
+    count=0
+    for gtp in gt_paths:
+        if isQuery(QUERY,gtp): count+=1
+    print(count)

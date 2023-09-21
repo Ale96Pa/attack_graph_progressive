@@ -102,13 +102,19 @@ def base_features_vulnID(vuln_id,vulnerabilities):
 
             return dicFeatures
 
+def dict_median(dict_list):
+    mean_dict = {}
+    for key in dict_list[0].keys():
+        mean_dict[key] = np.median([d[key] for d in dict_list], axis=0)
+    return mean_dict
 def embed_function(cves_list,isQuery,vulnerabilities):
     subtraining=[]
     for cvetrace in cves_list:
         embedding = []
         for cve in cvetrace:
             embedding.append(base_features_vulnID(cve,vulnerabilities))
-        cve_data_dict = dict(pd.DataFrame(embedding).median(axis=0)) # embedding based on median
+        # cve_data_dict = dict(pd.DataFrame(embedding).median(axis=0)) # embedding based on median
+        cve_data_dict = dict_median(embedding)
         cve_data_dict["query"] = isQuery
         subtraining.append(cve_data_dict)
     return subtraining
