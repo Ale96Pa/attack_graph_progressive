@@ -2,18 +2,28 @@ import json, csv
 
 ### BENCHMARK parameters
 num_cores = 3
+clean_dataset=True
+collision_end_value_query = 0.999
+collision_end_value_other = 0.9
+collision_control = 15 #number of tuples to consider for average collisions
 
 ### SAMPLING parameters
 sampling_algorithms = ["random"]#,"random", "bfs","dfs"]
 num_samples = 50
-collision_control = 7 #number of tuples to consider for average collisions
 steering_types = ["none","steering"]
+
+### STEERING parameters
 precision_window = 10
+QUERY = {
+    # 'length': [2,4],
+    'impact': [1,5],
+    'likelihood': [0,4]
+}
 
 
 ### NETWORK SETTING parameters
-nhosts = [10]
-nvulns = [5]
+nhosts = [8]
+nvulns = [10]
 topologies = ["random"]#,"tree"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
 distro = ["uniform"] #uniform,bernoulli,poisson,binomial
 diversity = [1] #0,0.25,0.5,0.75,1
@@ -64,17 +74,6 @@ def write_header_steering_performance(file_steering):
         writer.writerow(["iteration","num_samples","num_query_paths","num_other_paths",
                          "steering_type","isSteering","collision_rate_query",
                          "collision_rate_other","time_generation","time_steering"])
-
-# ### base features settings
-# def get_base_stats_file(ind): return "/stats/base_stats_"+str(ind)+".csv"
-# def get_base_sample_file(ind): return "/stats/base_samples_"+str(ind)+".csv"
-
-# ### derivative features settings
-# def get_derivative_sample(ind): return "/stats/derivative_samples_"+str(ind)+".csv"
-# def get_derivative_gt(ind): return "/stats/derivative_gt_"+str(ind)+".csv"
-
-# ## steering performance setting
-# def get_steering_stats(ind): return "/stats/steering_performance_"+str(ind)+".csv" 
 
 ### Inventories
 cpe_file = "inventory/services.json"

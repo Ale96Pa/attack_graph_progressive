@@ -81,7 +81,8 @@ def run_experiment(params):
     start_generation = time.perf_counter()
     track_precisions=[]
     try:
-        while(collision_condition_query<=0.9 or collision_condition_other<=0.9):
+        while(collision_condition_query<=config.collision_end_value_query or 
+              collision_condition_other<=config.collision_end_value_other):
             count_iteration+=1
             sampled_paths = sample_paths_reachability(RG,rg_nodes,config.num_samples,sampling_method)
             
@@ -102,8 +103,8 @@ def run_experiment(params):
             num_other_paths, coll_other = sampling.commit_paths_to_file(attack_paths_other,filename_sample_other,count_iteration)
             collisions_other.append(coll_other)
 
-            collision_condition_query = sum(collisions_query[-cc:])/cc
-            collision_condition_other = sum(collisions_other[-cc:])/cc
+            collision_condition_query = statistics.median(collisions_query[-cc:])#sum(collisions_query[-cc:])/cc
+            collision_condition_other = statistics.median(collisions_other[-cc:])#sum(collisions_other[-cc:])/cc
             
             current_precision = len(attack_paths_query)/config.num_samples
             track_precisions.append(current_precision)
@@ -115,7 +116,7 @@ def run_experiment(params):
                 stopSteering=True
 
                 median_precision = statistics.median(track_precisions[-config.precision_window:]) #sum(track_precisions[-config.precision_window:])/config.precision_window
-                if median_precision >= current_precision:
+                if median_precision > current_precision:
                     stopSteering=False
                     print("restart steering at iteration: ", count_iteration)
                     logging.info("[RESTART STEERING] of setting %s experiment %d steering %s at iteration %d",
@@ -160,19 +161,14 @@ if __name__ == "__main__":
     Build dataset reachability graphs according to network settings 
     hosts,vulnerabilities,topology,diversity,distribution (see config file)
     """
-    build_dataset(clean_data=False)
-    QUERY = {
-        # 'length': [2,4],
-        'impact': [1,5],
-        'likelihood': [0,4]
-    }
+    build_dataset(clean_data=config.clean_dataset)
 
     params=[]
     for network in os.listdir(config.ROOT_FOLDER):
         for method in config.sampling_algorithms:
             for steer_type in config.steering_types:
                 for experiment in range(1,config.num_experiments+1):
-                    params.append([network,method,QUERY,steer_type,experiment])
+                    params.append([network,method,config.QUERY,steer_type,experiment])
 
     with ProcessPool(max_workers=config.num_cores) as pool:
         process = pool.map(run_experiment, params)

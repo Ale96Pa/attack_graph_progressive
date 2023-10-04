@@ -1,12 +1,8 @@
 import os, json
-import walker
 import networkx as nx
-import csrgraph as cg
-import numpy as np
 import random
 
 def random_sampling(G,start_node,len_paths):
-    
     path = [start_node]
     for _ in range(len_paths - 1):
         neighbors = list(G.neighbors(path[-1]))

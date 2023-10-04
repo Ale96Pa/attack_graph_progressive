@@ -28,7 +28,7 @@ def plot_time_steering(folder,plot_folder,df_experiments,param_time,sampling_alg
     plt.savefig(folder+plot_folder+sampling_algo+"_"+param_time+".png", bbox_inches='tight')
 
 
-def plot_lines_steering_all(folder,plot_folder,df_experiments,sampling_algo=""):
+def plot_lines_steering_all(folder,plot_folder,df_experiments,sampling_algo="",tot_paths=None):
     plt.rcParams.update({'font.size': 24})
     fig, axs = plt.subplots()
     fig.set_figwidth(15)
@@ -39,7 +39,8 @@ def plot_lines_steering_all(folder,plot_folder,df_experiments,sampling_algo=""):
         if len(index_steering)>0:
             print("Iteration where steering started: ", index_steering[0])
     
-    tot_paths = max(list(df_experiments["num_query_paths"]))
+    if not tot_paths:
+        tot_paths = max(list(df_experiments["num_query_paths"]))
     df_experiments = df_experiments[df_experiments.steering_type == "steering"]
     grouped_by_sample = df_experiments.groupby(['experiment'])
     labels_legend = []
@@ -59,7 +60,7 @@ def plot_lines_steering_all(folder,plot_folder,df_experiments,sampling_algo=""):
 
     plt.savefig(folder+plot_folder+sampling_algo+"_steering_ALL.png", bbox_inches='tight')
     
-def plot_lines_steering(folder,plot_folder,df_experiments,sampling_algo=""):
+def plot_lines_steering(folder,plot_folder,df_experiments,sampling_algo="",tot_paths=None):
     plt.rcParams.update({'font.size': 24})
     fig, axs = plt.subplots()
     fig.set_figwidth(15)
@@ -70,7 +71,8 @@ def plot_lines_steering(folder,plot_folder,df_experiments,sampling_algo=""):
         if len(index_steering)>0:
             print("Iteration where steering started: ", index_steering[0])
     
-    tot_paths = max(list(df_experiments["num_query_paths"]))
+    if not tot_paths:
+        tot_paths = max(list(df_experiments["num_query_paths"]))
     
     grouped_by_sample = df_experiments.groupby(["steering_type"])
     labels_legend = []
@@ -425,6 +427,8 @@ if __name__ == "__main__":
         's':"random"
     }
 
+    
+
     df_steers = {}
     df_samples = {}
     df_stats = {}
@@ -445,7 +449,12 @@ if __name__ == "__main__":
                                         """
                                         SAMPLING
                                         """
-                                        if os.path.exists(folder_name+config.gt_paths): GT_path_file = folder_name+config.gt_paths
+                                        if os.path.exists(folder_name+config.gt_paths): 
+                                            GT_path_file = folder_name+config.gt_paths
+                                            with open(GT_path_file) as f: gt_paths = json.load(f)
+                                            count_query_paths=0
+                                            for gtp in gt_paths:
+                                                if isQuery(config.QUERY,gtp): count_query_paths+=1
 
                                         filename_sample_other = folder_name+samplingType+\
                                                     "/exp"+str(exp)+config.get_samples_filename("none")
@@ -527,20 +536,9 @@ if __name__ == "__main__":
                                 list_df_extended.append(df_curr)
                             df_sampling = pd.concat(list_df_extended)
 
-                            plot_lines_steering_all("",current_folder_plot,df_sampling,k)
+                            # count_query_paths=None
+                            plot_lines_steering_all("",current_folder_plot,df_sampling,k,count_query_paths)
 
                             averages_stats = df_sampling.groupby(['iteration','num_samples','steering_type']).median().reset_index()
                             # averages_stats.to_csv(current_folder_plot+"/avg_stats.csv",index=False)
-                            plot_lines_steering("",current_folder_plot,averages_stats,k)
-
-
-    # QUERY = {
-    #     # 'length': [2,4],
-    #     'impact': [1,5],
-    #     'likelihood': [0,4]
-    # }
-    # with open(GT_path_file) as f: gt_paths = json.load(f)
-    # count=0
-    # for gtp in gt_paths:
-    #     if isQuery(QUERY,gtp): count+=1
-    # print(count)
+                            plot_lines_steering("",current_folder_plot,averages_stats,k,count_query_paths)
