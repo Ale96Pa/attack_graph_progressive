@@ -1,4 +1,4 @@
-import random, hashlib
+import random, hashlib, statistics
 
 def get_vulns_by_hostname(dev_hostname,devices):
     cve_list=[]
@@ -60,24 +60,29 @@ def get_derivative_features(vuln):
         metricV2 = vuln["metrics"]["cvssMetricV2"][0]
         impact = metricV2["impactScore"]
         likelihood = metricV2["exploitabilityScore"]
+        score = metricV2["cvssData"]["baseScore"]
     elif "cvssMetricV30" in vuln["metrics"]:
         metricV3 = vuln["metrics"]["cvssMetricV30"][0]
         impact = metricV3["impactScore"]
         likelihood = metricV3["exploitabilityScore"]
+        score = metricV3["cvssData"]["baseScore"]
     elif "cvssMetricV31" in vuln["metrics"]:
         metricV3 = vuln["metrics"]["cvssMetricV31"][0]
         impact = metricV3["impactScore"]
         likelihood = metricV3["exploitabilityScore"]
+        score = metricV3["cvssData"]["baseScore"]
     else: #default values
         impact = 5 
         likelihood = 5
-    return impact,likelihood
+        score = 5
+    return impact,likelihood,score
 
 def reachability_to_attack(reachability_path,devices,vulnerabilities,steering_vulns):
     processed_targets={}
     trace = ""
     impacts=[]
     likelihoods=[]
+    scores=[]
     vulnerabilities_path = []
     for edge in reachability_path:
         target_hostname = edge[1]
@@ -104,15 +109,17 @@ def reachability_to_attack(reachability_path,devices,vulnerabilities,steering_vu
         else: trace += src+"#"+attack_vuln+"#"+dst+"##"
 
         vulnerabilities_path.append(vuln)
-        impact,likelihood=get_derivative_features(vuln)
+        impact,likelihood,score=get_derivative_features(vuln)
         impacts.append(impact)
         likelihoods.append(likelihood)
+        scores.append(score)
 
     return {
         "id": hashlib.sha256(str(trace).encode("utf-8")).hexdigest(),
         "trace": trace,
         "length": len(impacts),
-        "impact": sum(impacts)/len(impacts),
-        "likelihood": sum(likelihoods)/len(likelihoods),
+        "impact": statistics.median(impacts), #sum(impacts)/len(impacts),
+        "likelihood": statistics.median(likelihoods), #sum(likelihoods)/len(likelihoods),
+        "score" : statistics.median(scores), #sum(scores)/len(scores)
     }, vulnerabilities_path
 

@@ -295,16 +295,19 @@ def gt_statistics_path(paths_file, file_derivative_features_gt):
     length = []
     impact = []
     likelihood = []
+    score=[]
     for doc in gt_docs:
         length.append(doc["length"])
         impact.append(doc["impact"])
         likelihood.append(doc["likelihood"])
-    df_GT = pd.DataFrame(columns=["length", "impact", "likelihood"])
+        score.append(doc["score"])
+    df_GT = pd.DataFrame(columns=["length", "impact", "likelihood","score"])
     df_GT["length"] = length
     df_GT["impact"] = impact
     df_GT["likelihood"] = likelihood
+    df_GT["score"] = score
     df_GT.to_csv(file_derivative_features_gt,index=False)
-    return length, impact, likelihood
+    return length, impact, likelihood, score
 
 """
 This function retrieve the distribution of the derivative features from the
@@ -314,21 +317,24 @@ def retrieve_derivative(list_paths):
     length = []
     impact = []
     likelihood = []
+    score = []
     for elem in list_paths:
         length.append(elem.length)
         impact.append(elem.impact)
         likelihood.append(elem.likelihood)
-    return length, impact, likelihood
+        score.append(elem.score)
+    return length, impact, likelihood, score
 
 """
 This function writes on file the derivative features of (generated) paths
 """
 def compare_derivative_gt(sample, coll, list_paths, file_derivative_features_samples):
-    curr_len, curr_imp, curr_lik = retrieve_derivative(list_paths)
-    df_curr = pd.DataFrame(columns=["sample", "collision_rate", "length", "impact", "likelihood"])
+    curr_len, curr_imp, curr_lik, curr_score = retrieve_derivative(list_paths)
+    df_curr = pd.DataFrame(columns=["sample", "collision_rate", "length", "impact", "likelihood", "score"])
     df_curr["sample"] = [sample]*len(curr_len)
     df_curr["collision_rate"] = [coll]*len(curr_len)
     df_curr["length"] = curr_len
     df_curr["impact"] = curr_imp
     df_curr["likelihood"] = curr_lik
+    df_curr["score"] = curr_score
     df_curr.to_csv(file_derivative_features_samples, mode='a', index=False, header=False)

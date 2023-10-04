@@ -1,5 +1,5 @@
 # import uuid
-import json, hashlib
+import json, hashlib, statistics
 from attack_paths import get_derivative_features
 
 # from base_features import base_features_distro
@@ -38,6 +38,7 @@ def monotonicity(src, trace):
 def derivative_features(edges):
     impact_p = []
     likelihood_p = []
+    score_p = []
     trace=""
     for edge in edges:
         v = edge.vulnerability
@@ -68,16 +69,19 @@ def derivative_features(edges):
             # else: #default values
             #     impact = 5 
             #     likelihood = 5
-            impact,likelihood = get_derivative_features(v)
+            impact,likelihood,score = get_derivative_features(v)
 
             impact_p.append(impact)
             likelihood_p.append(likelihood)
+            score_p.append(score)
     
     length = len(impact_p)
     return {"trace": trace,
             "length": length,
-            "impact": sum(impact_p)/length,
-            "likelihood": sum(likelihood_p)/length}
+            "impact": statistics.median(impact_p), #sum(impact_p)/len(impact_p),
+            "likelihood": statistics.median(likelihood_p), #sum(likelihood_p)/len(likelihood_p),
+            "score": statistics.median(score_p), #sum(score_p)/len(score_p)
+            }
 
 class AttackPath:
     def __init__(self,nodes,edges):
@@ -88,6 +92,7 @@ class AttackPath:
         self.trace = features["trace"]
         self.impact = features["impact"]
         self.likelihood = features["likelihood"]
+        self.score = features["score"]
         self.id = hashlib.sha256(str(features["trace"]).encode("utf-8")).hexdigest()
         # self.base_features = base_features(edges)
 
@@ -96,7 +101,8 @@ class AttackPath:
                 "length": self.length,
                 "trace": self.trace,
                 "impact": self.impact,
-                "likelihood": self.likelihood}
+                "likelihood": self.likelihood,
+                "score": self.score}
                 # "base_features": self.base_features}
     
     def exists(self, paths_file):

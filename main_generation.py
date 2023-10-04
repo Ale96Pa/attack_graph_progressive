@@ -1,4 +1,4 @@
-import json, itertools, os, logging, traceback, hashlib
+import json, itertools, os, logging, traceback, hashlib, statistics
 import networkx as nx
 from pebble import ProcessPool
 
@@ -38,6 +38,7 @@ def reachability_to_attack(reachability_path,devices,vulnerabilities,path_vulns)
     trace = ""
     impacts=[]
     likelihoods=[]
+    scores=[]
 
     counter_edge=0
     for edge in reachability_path:
@@ -50,17 +51,19 @@ def reachability_to_attack(reachability_path,devices,vulnerabilities,path_vulns)
         if edge == reachability_path[-1]: trace += src+"#"+attack_vuln+"#"+dst
         else: trace += src+"#"+attack_vuln+"#"+dst+"##"
 
-        impact,likelihood=get_derivative_features(vuln)
+        impact,likelihood,score=get_derivative_features(vuln)
         impacts.append(impact)
         likelihoods.append(likelihood)
+        scores.append(score)
         counter_edge+=1
 
     return {
         "id": hashlib.sha256(str(trace).encode("utf-8")).hexdigest(),
         "trace": trace,
         "length": len(impacts),
-        "impact": sum(impacts)/len(impacts),
-        "likelihood": sum(likelihoods)/len(likelihoods),
+        "impact": statistics.median(impacts), #sum(impacts)/len(impacts),
+        "likelihood": statistics.median(likelihoods), #sum(likelihoods)/len(likelihoods),
+        "score": statistics.median(scores), #sum(scores)/len(scores)
     }
 
 """

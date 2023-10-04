@@ -2,32 +2,36 @@ import json, csv
 
 ### BENCHMARK parameters
 num_cores = 3
+num_experiments = 1
 clean_dataset=True
-collision_end_value_query = 0.999
-collision_end_value_other = 0.9
+collision_end_value_query = 0.95
+collision_end_value_other = 0.85
 collision_control = 15 #number of tuples to consider for average collisions
 
 ### SAMPLING parameters
 sampling_algorithms = ["random"]#,"random", "bfs","dfs"]
 num_samples = 50
 steering_types = ["none","steering"]
+# steering_types = ["steering"]
 
 ### STEERING parameters
-precision_window = 10
+precision_control=1.3
+smoothing_window = 20
+decision_window = 15
+decision_num_restart = 0.25
 QUERY = {
     # 'length': [2,4],
-    'impact': [1,5],
+    'impact': [2,5],
     'likelihood': [0,4]
 }
 
 
 ### NETWORK SETTING parameters
 nhosts = [8]
-nvulns = [10]
-topologies = ["random"]#,"tree"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
+nvulns = [8]
+topologies = ["powerlaw"]#,"tree"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
 distro = ["uniform"] #uniform,bernoulli,poisson,binomial
 diversity = [1] #0,0.25,0.5,0.75,1
-num_experiments = 3
 start_steering_collision = 0.3
 
 nhosts_per = [9,15,25,35,50,55,60]

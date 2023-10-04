@@ -39,6 +39,7 @@ def run_experiment(params):
                 "/exp"+str(num_exp)+"/"+config.stats_steering
 
     cc = config.collision_control
+    if steer_type=="steering": cc = config.collision_control*2
 
     with open(network_file) as net_f: file_content = json.load(net_f)
     edges_reachability = file_content["edges"]
@@ -69,21 +70,34 @@ def run_experiment(params):
     """
     Sampling the reachability paths
     """
+    steering_vulnerabilities=[]
+    sampled_vulnerabilities=[]
+
     collisions_query=[0]
     collisions_other=[0]
     collision_condition_other=0
     collision_condition_query=0
+
     isSteering=False
     stopSteering=False
-    steering_vulnerabilities=[]
-    count_iteration=0
-    sampled_vulnerabilities=[]
-    start_generation = time.perf_counter()
     track_precisions=[]
+    low_precision_restart=[]
+    median_num_restart=0
+    median_precision=0
+
+    count_iteration=0
+    start_generation = time.perf_counter()
     try:
-        while(collision_condition_query<=config.collision_end_value_query or 
-              collision_condition_other<=config.collision_end_value_other):
+        while(True):
             count_iteration+=1
+            """
+            Breaking conditions
+            """
+            if steer_type=="steering" and median_num_restart!=0 and collision_condition_query>=config.collision_end_value_query and \
+            count_iteration-median_num_restart<=count_iteration*config.decision_num_restart: break
+            if steer_type=="none" and collision_condition_other>=config.collision_end_value_other \
+                        and collision_condition_query>=config.collision_end_value_query: break
+
             sampled_paths = sample_paths_reachability(RG,rg_nodes,config.num_samples,sampling_method)
             
             attack_paths_query = []
@@ -103,25 +117,34 @@ def run_experiment(params):
             num_other_paths, coll_other = sampling.commit_paths_to_file(attack_paths_other,filename_sample_other,count_iteration)
             collisions_other.append(coll_other)
 
-            collision_condition_query = statistics.median(collisions_query[-cc:])#sum(collisions_query[-cc:])/cc
-            collision_condition_other = statistics.median(collisions_other[-cc:])#sum(collisions_other[-cc:])/cc
+            collision_condition_query = statistics.median(collisions_query[-cc:])
+            collision_condition_other = statistics.median(collisions_other[-cc:])
             
-            current_precision = len(attack_paths_query)/config.num_samples
+            current_precision = len(attack_paths_query)/(len(attack_paths_query)+len(attack_paths_other))
             track_precisions.append(current_precision)
 
-            if collision_condition_query >= config.start_steering_collision and steer_type=="steering": isSteering=True
+            if collision_condition_query >= config.start_steering_collision and \
+             num_query_paths>=10 and num_other_paths>=10 and steer_type=="steering": isSteering=True
+            
             start_steering = time.perf_counter()
-            if isSteering and steer_type=="steering" and not stopSteering:
-                steering_vulnerabilities=steering.get_steering_vulns(filename_sample_query,filename_sample_other,vulnerabilities)
-                stopSteering=True
+            if isSteering and steer_type=="steering":
+                if not stopSteering:
+                    steering_vulnerabilities=steering.get_steering_vulns(filename_sample_query,filename_sample_other,vulnerabilities)
+                    stopSteering=True
 
-                median_precision = statistics.median(track_precisions[-config.precision_window:]) #sum(track_precisions[-config.precision_window:])/config.precision_window
-                if median_precision > current_precision:
-                    stopSteering=False
-                    print("restart steering at iteration: ", count_iteration)
-                    logging.info("[RESTART STEERING] of setting %s experiment %d steering %s at iteration %d",
-                            subfolder,num_exp,steer_type,count_iteration)
-                    print(current_precision, track_precisions[-config.precision_window:])
+                if len(track_precisions) >= config.smoothing_window:
+                    median_precision = statistics.median(track_precisions[-config.smoothing_window:])
+                    # print(median_precision,current_precision,config.precision_control*current_precision)
+                    if median_precision > config.precision_control*current_precision:
+                        stopSteering=False
+                        # print("restart steering at iteration: ", count_iteration)
+                        logging.info("[RESTART STEERING] of setting %s experiment %d at iteration %d",
+                                subfolder,num_exp,count_iteration)
+                        
+                        low_precision_restart.append(count_iteration)
+                        if len(low_precision_restart)>5:
+                            median_num_restart = statistics.median(low_precision_restart[-config.decision_window:])
+                            # print(median_num_restart,count_iteration,count_iteration-median_num_restart,count_iteration*config.decision_num_restart)
             
             if steer_type=="none":
                 distro_sampled_vuln = fm.base_features_distro(sampled_vulnerabilities)
@@ -147,8 +170,15 @@ def run_experiment(params):
                                  collision_condition_other,
                                  end_time-start_generation,end_time-start_steering])
                 
-            if count_iteration%25 == 0: 
-                logging.info("Iteration %d of setting %s experiment %d steering %s: collision query %f, collision other %f",
+            # print("restart", median_num_restart, low_precision_retarts,)
+            # print(current_precision, median_precision)
+                
+            if count_iteration%25 == 0:
+                if steer_type == "steering":
+                    logging.info("Iteration %d of setting %s experiment %d %s: current/median precision %f/%f, median restart %f, collisions (query,other): %f - %f",
+                             count_iteration,subfolder,num_exp,steer_type,current_precision,median_precision,median_num_restart,collision_condition_query,collision_condition_other)
+                else:
+                    logging.info("Iteration %d of setting %s experiment %d %s: collision query %f, collision other %f",
                              count_iteration,subfolder,num_exp,steer_type,collision_condition_query,collision_condition_other)
         logging.info("[END] folder %s, experiment %d, sampling: %s, steering: %s, collisions (query,other): %f - %f", subfolder,num_exp,sampling_method,steer_type,collision_condition_query,collision_condition_other)
     except Exception as e:
