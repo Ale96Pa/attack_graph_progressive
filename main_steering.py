@@ -86,6 +86,8 @@ def run_experiment(params):
     median_precision=0
 
     count_iteration=0
+    count_same_query=0
+    old_num_query_paths=0
     start_generation = time.perf_counter()
     try:
         while(True):
@@ -93,6 +95,7 @@ def run_experiment(params):
             """
             Breaking conditions
             """
+            if steer_type=="steering" and count_same_query==config.max_iteration_same_query: break
             if steer_type=="steering" and median_num_restart!=0 and collision_condition_query>=config.collision_end_value_query and \
             count_iteration-median_num_restart<=count_iteration*config.decision_num_restart: break
             if steer_type=="none" and collision_condition_other>=config.collision_end_value_other \
@@ -134,17 +137,14 @@ def run_experiment(params):
 
                 if len(track_precisions) >= config.smoothing_window:
                     median_precision = statistics.median(track_precisions[-config.smoothing_window:])
-                    # print(median_precision,current_precision,config.precision_control*current_precision)
                     if median_precision > config.precision_control*current_precision:
                         stopSteering=False
-                        # print("restart steering at iteration: ", count_iteration)
                         logging.info("[RESTART STEERING] of setting %s experiment %d at iteration %d",
                                 subfolder,num_exp,count_iteration)
                         
                         low_precision_restart.append(count_iteration)
                         if len(low_precision_restart)>5:
                             median_num_restart = statistics.median(low_precision_restart[-config.decision_window:])
-                            # print(median_num_restart,count_iteration,count_iteration-median_num_restart,count_iteration*config.decision_num_restart)
             
             if steer_type=="none":
                 distro_sampled_vuln = fm.base_features_distro(sampled_vulnerabilities)
@@ -163,15 +163,17 @@ def run_experiment(params):
                 sampling.write_base_sample_iteration(filename_sampling_stats,[distro_sampled_vuln,stats_compare_vuln])
 
             end_time = time.perf_counter()
+
+            if old_num_query_paths == num_query_paths: count_same_query+=1
+            else: count_same_query=0
+            old_num_query_paths = num_query_paths
+
             with open(filename_steering_stats, "a", newline='') as f_steer:
                 writer = csv.writer(f_steer)
                 writer.writerow([count_iteration,config.num_samples,num_query_paths,
                                  num_other_paths,steer_type,isSteering,collision_condition_query,
                                  collision_condition_other,
-                                 end_time-start_generation,end_time-start_steering])
-                
-            # print("restart", median_num_restart, low_precision_retarts,)
-            # print(current_precision, median_precision)
+                                 end_time-start_generation,end_time-start_steering,query["id"]])
                 
             if count_iteration%25 == 0:
                 if steer_type == "steering":
@@ -193,12 +195,17 @@ if __name__ == "__main__":
     """
     build_dataset(clean_data=config.clean_dataset)
 
+    queries = [config.QUERY] #config.all_combination_queries()
+
     params=[]
     for network in os.listdir(config.ROOT_FOLDER):
         for method in config.sampling_algorithms:
             for steer_type in config.steering_types:
-                for experiment in range(1,config.num_experiments+1):
-                    params.append([network,method,config.QUERY,steer_type,experiment])
+                # for experiment in range(1,config.num_experiments+1):
+                    count=1
+                    for q in queries:
+                        params.append([network,method,q,steer_type,count])
+                        count+=1
 
     with ProcessPool(max_workers=config.num_cores) as pool:
         process = pool.map(run_experiment, params)

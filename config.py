@@ -1,8 +1,8 @@
-import json, csv
+import json, csv, itertools
 
 ### BENCHMARK parameters
 num_cores = 3
-num_experiments = 1
+num_experiments = 3
 clean_dataset=True
 collision_end_value_query = 0.95
 collision_end_value_other = 0.85
@@ -19,26 +19,63 @@ precision_control=1.3
 smoothing_window = 20
 decision_window = 15
 decision_num_restart = 0.25
-QUERY = {
-    # 'length': [2,4],
-    'impact': [2,5],
-    'likelihood': [0,4]
-}
+max_iteration_same_query = 1000
 
+### QUERIES parameters
+QUERY={
+    'id': "0",
+    'impact': [3,5],
+    'likelihood': [5,8]
+}
+size_ranges=[[3,4],[3,6],[3,8]]
+def all_combination_queries():
+    queries=[]
+    for L in range(len(size_ranges) + 1):
+        for subset in itertools.product(size_ranges, repeat=L):
+            if len(subset) == 1:
+                queries.append({
+                'id': "impact:"+str(subset[0]),
+                "impact": subset[0]
+                })
+                queries.append({
+                'id': "score:"+str(subset[0]),
+                "impact": subset[0]
+                })
+                queries.append({
+                'id': "likelihood:"+str(subset[0]),
+                "impact": subset[0]
+                })
+                # print("impact:"+str(subset[0]))
+            elif len(subset) == 2:
+                queries.append({
+                'id': "impact:"+str(subset[0])+"#score:"+str(subset[1]),
+                'impact': subset[0],
+                'score': subset[1]
+                })
+                # print("impact:"+str(subset[0])+"#score:"+str(subset[1]))
+            elif len(subset) == 3:
+                queries.append({
+                'id': "impact:"+str(subset[0])+"#score:"+str(subset[1])+"#likelihood:"+str(subset[2]),
+                'impact': subset[0],
+                'score': subset[1],
+                'likelihood': subset[2]
+                })
+                # print("impact:"+str(subset[0])+"#score:"+str(subset[1])+"#likelihood:"+str(subset[2]))
+    return queries
 
 ### NETWORK SETTING parameters
 nhosts = [8]
-nvulns = [8]
+nvulns = [10]
 topologies = ["powerlaw"]#,"tree"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
 distro = ["uniform"] #uniform,bernoulli,poisson,binomial
 diversity = [1] #0,0.25,0.5,0.75,1
 start_steering_collision = 0.3
 
-nhosts_per = [9,15,25,35,50,55,60]
+nhosts_per = [5,10,15,20,25,30,35]
 nvulns_per = [3]
 topologies_per = ["powerlaw"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
 distro_per = ["uniform"]
-diversity_per = [0.5]
+diversity_per = [0]
 num_experiments_per = 10
 
 ### NETWORK FILES parameters
@@ -77,7 +114,7 @@ def write_header_steering_performance(file_steering):
         writer = csv.writer(f)
         writer.writerow(["iteration","num_samples","num_query_paths","num_other_paths",
                          "steering_type","isSteering","collision_rate_query",
-                         "collision_rate_other","time_generation","time_steering"])
+                         "collision_rate_other","time_generation","time_steering","query"])
 
 ### Inventories
 cpe_file = "inventory/services.json"

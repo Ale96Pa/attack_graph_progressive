@@ -1,4 +1,4 @@
-import os, logging, json, random, csv, traceback, time
+import os, logging, json, random, csv, traceback, time, statistics
 import networkx as nx
 import pandas as pd
 from pebble import ProcessPool
@@ -10,6 +10,7 @@ import sampling
 import steering
 import config
 from main_generation import generate_all_paths
+import features_management as fm
 
 def sample_paths_reachability(G,rg_nodes,num_samples,method):
     sampled_paths=[]
@@ -35,13 +36,21 @@ def run_experiment(params):
                 "/exp"+str(num_exp)+config.get_query_samples_filename(steer_type)
     filename_sample_other = config.ROOT_FOLDER_PERFORMANCE+subfolder+"/"+sampling_method+\
                 "/exp"+str(num_exp)+config.get_samples_filename(steer_type)
+    filename_sampling_stats = config.ROOT_FOLDER_PERFORMANCE+subfolder+"/"+sampling_method+\
+                "/exp"+str(num_exp)+"/"+config.stats_sampling
+    filename_steering_stats = config.ROOT_FOLDER_PERFORMANCE+subfolder+"/"+sampling_method+\
+                "/exp"+str(num_exp)+"/"+config.stats_steering
 
     cc = config.collision_control
+    if steer_type=="steering": cc = config.collision_control*2
 
     with open(network_file) as net_f: file_content = json.load(net_f)
     edges_reachability = file_content["edges"]
     devices = file_content["devices"]
     vulnerabilities = file_content["vulnerabilities"]
+
+    if not os.path.exists(filename_steering_stats):
+        config.write_header_steering_performance(filename_steering_stats)
 
     RG=nx.DiGraph()
     for net_edge in edges_reachability: 
@@ -52,71 +61,141 @@ def run_experiment(params):
                  subfolder,num_exp,sampling_method,steer_type)
 
     """
+    Ground truth of base features distribution
+    """
+    base_features_gt_filename = config.ROOT_FOLDER_PERFORMANCE+subfolder+"/"+config.gt_base
+    GT_base_stats = fm.base_features_distro(vulnerabilities)
+    if not os.path.exists(base_features_gt_filename):
+        with open(base_features_gt_filename, "w") as outfile:
+            json_base_gt = json.dumps(GT_base_stats, default=lambda o: o.__dict__, indent=2)
+            outfile.write(json_base_gt)
+
+    """
     Sampling the reachability paths
     """
+    steering_vulnerabilities=[]
+    sampled_vulnerabilities=[]
+
     collisions_query=[0]
     collisions_other=[0]
     collision_condition_other=0
     collision_condition_query=0
+
     isSteering=False
     stopSteering=False
-    steering_vulnerabilities=[]
-    count_iteration=0
-    sampled_vulnerabilities=[]
-    
-    start_generation = time.perf_counter()
-    if steer_type == "none":
-        num_paths = generate_all_paths(subfolder)
-    else:
-        try:
-            num_paths=0
-            while(collision_condition_query<=0.8):
-                count_iteration+=1
-                sampled_paths = sample_paths_reachability(RG,rg_nodes,config.num_samples,sampling_method)
-                
-                attack_paths_query = []
-                attack_paths_other = []
-                for path in sampled_paths:
-                    single_attack_path, path_vulns = ap.reachability_to_attack(path,devices,vulnerabilities,steering_vulnerabilities)
-                    if steering.isQuery(query,single_attack_path): attack_paths_query.append(single_attack_path)
-                    else: attack_paths_other.append(single_attack_path)
-                    
-                    for new_vuln in path_vulns:
-                        existing_ids = [val['id'] for val in sampled_vulnerabilities]
-                        if new_vuln["id"] not in existing_ids:
-                            sampled_vulnerabilities.append(new_vuln)
-                
-                num_query_paths, coll_query = sampling.commit_paths_to_file(attack_paths_query,filename_sample_query,count_iteration)
-                collisions_query.append(coll_query)
-                num_other_paths, coll_other = sampling.commit_paths_to_file(attack_paths_other,filename_sample_other,count_iteration)
-                collisions_other.append(coll_other)
+    track_precisions=[]
+    low_precision_restart=[]
+    median_num_restart=0
+    median_precision=0
 
-                collision_condition_query = sum(collisions_query[-cc:])/cc
-                collision_condition_other = sum(collisions_other[-cc:])/cc
+    count_iteration=0
+    count_same_query=0
+    old_num_query_paths=0
+    start_generation = time.perf_counter()
+    try:
+        while(True):
+            count_iteration+=1
+            """
+            Breaking conditions
+            """
+            if steer_type=="steering" and count_same_query==config.max_iteration_same_query: break
+            if steer_type=="steering" and median_num_restart!=0 and collision_condition_query>=config.collision_end_value_query and \
+            count_iteration-median_num_restart<=count_iteration*config.decision_num_restart: break
+            if steer_type=="none" and collision_condition_other>=config.collision_end_value_other \
+                        and collision_condition_query>=config.collision_end_value_query: break
+
+            sampled_paths = sample_paths_reachability(RG,rg_nodes,config.num_samples,sampling_method)
+            
+            attack_paths_query = []
+            attack_paths_other = []
+            for path in sampled_paths:
+                single_attack_path, path_vulns = ap.reachability_to_attack(path,devices,vulnerabilities,steering_vulnerabilities)
+                if steering.isQuery(query,single_attack_path): attack_paths_query.append(single_attack_path)
+                else: attack_paths_other.append(single_attack_path)
                 
-                if collision_condition_query >= config.start_steering_collision: isSteering=True
-                start_steering = time.perf_counter()
-                if isSteering and steer_type=="steering" and not stopSteering:
+                for new_vuln in path_vulns:
+                    existing_ids = [val['id'] for val in sampled_vulnerabilities]
+                    if new_vuln["id"] not in existing_ids:
+                        sampled_vulnerabilities.append(new_vuln)
+            
+            num_query_paths, coll_query = sampling.commit_paths_to_file(attack_paths_query,filename_sample_query,count_iteration)
+            collisions_query.append(coll_query)
+            num_other_paths, coll_other = sampling.commit_paths_to_file(attack_paths_other,filename_sample_other,count_iteration)
+            collisions_other.append(coll_other)
+
+            collision_condition_query = statistics.median(collisions_query[-cc:])
+            collision_condition_other = statistics.median(collisions_other[-cc:])
+            
+            current_precision = len(attack_paths_query)/(len(attack_paths_query)+len(attack_paths_other))
+            track_precisions.append(current_precision)
+
+            if collision_condition_query >= config.start_steering_collision and \
+             num_query_paths>=10 and num_other_paths>=10 and steer_type=="steering": isSteering=True
+            
+            start_steering = time.perf_counter()
+            if isSteering and steer_type=="steering":
+                if not stopSteering:
                     steering_vulnerabilities=steering.get_steering_vulns(filename_sample_query,filename_sample_other,vulnerabilities)
                     stopSteering=True
 
-                if count_iteration%20 == 0: 
-                    logging.info("%s %d iteration %d %s: num paths: %d collision %f",
-                                subfolder,num_exp, count_iteration,steer_type,num_query_paths,collision_condition_query)
-                    
-                if count_iteration>900 and collision_condition_query<=0:
-                    logging.error("[INTERRUPT] %s %s, collision: %f",subfolder,steer_type,collision_condition_query)
-                    return
+                if len(track_precisions) >= config.smoothing_window:
+                    median_precision = statistics.median(track_precisions[-config.smoothing_window:])
+                    if median_precision > config.precision_control*current_precision:
+                        stopSteering=False
+                        logging.info("[RESTART STEERING] of setting %s experiment %d at iteration %d",
+                                subfolder,num_exp,count_iteration)
+                        
+                        low_precision_restart.append(count_iteration)
+                        if len(low_precision_restart)>5:
+                            median_num_restart = statistics.median(low_precision_restart[-config.decision_window:])
+            
+            if steer_type=="none":
+                distro_sampled_vuln = fm.base_features_distro(sampled_vulnerabilities)
+                stats_compare_vuln = fm.compare_stats(GT_base_stats, distro_sampled_vuln)
+
+                stats_compare_vuln["type"] = "stats"
+                stats_compare_vuln["collision_rate"] = (collision_condition_other+collision_condition_query)/2
+                stats_compare_vuln["iteration"] = count_iteration
+                stats_compare_vuln["sample_size"] = config.num_samples
+
+                distro_sampled_vuln["type"] = "sample"
+                distro_sampled_vuln["collision_rate"] = (collision_condition_other+collision_condition_query)/2
+                distro_sampled_vuln["iteration"] = count_iteration
+                distro_sampled_vuln["sample_size"] = config.num_samples
+
+                sampling.write_base_sample_iteration(filename_sampling_stats,[distro_sampled_vuln,stats_compare_vuln])
+
+            end_time = time.perf_counter()
+
+            if old_num_query_paths == num_query_paths: count_same_query+=1
+            else: count_same_query=0
+            old_num_query_paths = num_query_paths
+
+            with open(filename_steering_stats, "a", newline='') as f_steer:
+                writer = csv.writer(f_steer)
+                writer.writerow([count_iteration,config.num_samples,num_query_paths,
+                                 num_other_paths,steer_type,isSteering,collision_condition_query,
+                                 collision_condition_other,
+                                 end_time-start_generation,end_time-start_steering,query["id"]])
                 
-                num_paths=num_query_paths+num_other_paths
-        except Exception as e:
-            traceback.print_exc()
-            logging.error("[ERROR] %s on experiment %s, sampling: %s, steering: %s", e,subfolder,sampling_method,steer_type)
-    end_generation = time.perf_counter()
+            if count_iteration%25 == 0:
+                if steer_type == "steering":
+                    logging.info("Iteration %d of setting %s experiment %d %s: current/median precision %f/%f, median restart %f, collisions (query,other): %f - %f",
+                             count_iteration,subfolder,num_exp,steer_type,current_precision,median_precision,median_num_restart,collision_condition_query,collision_condition_other)
+                else:
+                    logging.info("Iteration %d of setting %s experiment %d %s: collision query %f, collision other %f",
+                             count_iteration,subfolder,num_exp,steer_type,collision_condition_query,collision_condition_other)
+        logging.info("[END] folder %s, experiment %d, sampling: %s, steering: %s, collisions (query,other): %f - %f", subfolder,num_exp,sampling_method,steer_type,collision_condition_query,collision_condition_other)
+    except Exception as e:
+        traceback.print_exc()
+        logging.error("[ERROR] %s on experiment %s, sampling: %s, steering: %s", e,subfolder,sampling_method,steer_type)
+    
+    
+    end_generation = time.perf_counter() 
     with open(config.plot_folder+"performance_stats.csv", "a", newline='') as f:
         writer = csv.writer(f)
         writer.writerow([steer_type,subfolder.split("_")[0],config.num_samples,
-                         count_iteration,num_paths,end_generation-start_generation,"range_query"])
+                         count_iteration,num_query_paths+num_other_paths,end_generation-start_generation,"range_query"])
 
     logging.info("[END] folder %s, experiment %d, sampling: %s, steering: %s", subfolder,num_exp,sampling_method,steer_type)
 
@@ -170,8 +249,9 @@ if __name__ == "__main__":
         #     'likelihood': [min_lik,max_lik]
         # }
         QUERY = {
+            "id": "0",
             # 'length': [2,4],
-            'impact': [1,5],
+            'impact': [0,5],
             'likelihood': [0,5]
         }
 
