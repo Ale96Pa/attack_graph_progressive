@@ -201,11 +201,11 @@ if __name__ == "__main__":
     for network in os.listdir(config.ROOT_FOLDER):
         for method in config.sampling_algorithms:
             for steer_type in config.steering_types:
-                # for experiment in range(1,config.num_experiments+1):
-                    count=1
+                for experiment in range(1,config.num_experiments+1):
+                    count=experiment#1
                     for q in queries:
                         params.append([network,method,q,steer_type,count])
-                        count+=1
+                        # count+=1
 
     with ProcessPool(max_workers=config.num_cores) as pool:
         process = pool.map(run_experiment, params)
