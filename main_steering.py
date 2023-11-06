@@ -135,16 +135,16 @@ def run_experiment(params):
                     steering_vulnerabilities=steering.get_steering_vulns(filename_sample_query,filename_sample_other,vulnerabilities)
                     stopSteering=True
 
-                if len(track_precisions) >= config.smoothing_window:
-                    median_precision = statistics.median(track_precisions[-config.smoothing_window:])
-                    if median_precision > config.precision_control*current_precision:
-                        stopSteering=False
-                        logging.info("[RESTART STEERING] of setting %s experiment %d at iteration %d",
-                                subfolder,num_exp,count_iteration)
-                        
-                        low_precision_restart.append(count_iteration)
-                        if len(low_precision_restart)>5:
-                            median_num_restart = statistics.median(low_precision_restart[-config.decision_window:])
+                # if len(track_precisions) >= config.smoothing_window:
+                median_precision = statistics.median(track_precisions[-config.smoothing_window:])
+                if median_precision > config.precision_control*current_precision:
+                    stopSteering=False
+                    logging.info("[RESTART STEERING] of setting %s experiment %d at iteration %d",
+                            subfolder,num_exp,count_iteration)
+                    
+                    low_precision_restart.append(count_iteration)
+                    if len(low_precision_restart)>5:
+                        median_num_restart = statistics.median(low_precision_restart[-config.decision_window:])
             
             if steer_type=="none":
                 distro_sampled_vuln = fm.base_features_distro(sampled_vulnerabilities)
@@ -177,12 +177,14 @@ def run_experiment(params):
                 
             if count_iteration%25 == 0:
                 if steer_type == "steering":
-                    logging.info("Iteration %d of setting %s experiment %d %s: current/median precision %f/%f, median restart %f, collisions (query,other): %f - %f",
-                             count_iteration,subfolder,num_exp,steer_type,current_precision,median_precision,median_num_restart,collision_condition_query,collision_condition_other)
+                    logging.info("Iteration %d of setting %s experiment %d %s: current/median precision %f/%f, median restart %f, collisions (query,other): %f - %f, num paths: %d",
+                             count_iteration,subfolder,num_exp,steer_type,current_precision,median_precision,median_num_restart,collision_condition_query,collision_condition_other, num_query_paths)
                 else:
                     logging.info("Iteration %d of setting %s experiment %d %s: collision query %f, collision other %f",
                              count_iteration,subfolder,num_exp,steer_type,collision_condition_query,collision_condition_other)
         logging.info("[END] folder %s, experiment %d, sampling: %s, steering: %s, collisions (query,other): %f - %f", subfolder,num_exp,sampling_method,steer_type,collision_condition_query,collision_condition_other)
+        end_generation = time.perf_counter()
+        logging.info("SAMPLE RATE: %d, TIME: %f, NUM PATH: %d",config.num_samples, end_generation-start_generation, num_query_paths)
     except Exception as e:
         traceback.print_exc()
         logging.error("[ERROR] %s on experiment %s, sampling: %s, steering: %s", e,subfolder,sampling_method,steer_type)
@@ -193,19 +195,21 @@ if __name__ == "__main__":
     Build dataset reachability graphs according to network settings 
     hosts,vulnerabilities,topology,diversity,distribution (see config file)
     """
-    build_dataset(clean_data=config.clean_dataset)
-
-    queries = [config.QUERY] #config.all_combination_queries()
+    # queries = [config.QUERY] 
+    queries = config.all_combination_queries()
+    
+    build_dataset(clean_data=config.clean_dataset, num_exps=len(queries))
 
     params=[]
     for network in os.listdir(config.ROOT_FOLDER):
         for method in config.sampling_algorithms:
             for steer_type in config.steering_types:
-                for experiment in range(1,config.num_experiments+1):
-                    count=experiment#1
+                # for experiment in range(1,config.num_experiments+1):
+                    # count=experiment
+                    count=1
                     for q in queries:
                         params.append([network,method,q,steer_type,count])
-                        # count+=1
+                        count+=1
 
     with ProcessPool(max_workers=config.num_cores) as pool:
         process = pool.map(run_experiment, params)

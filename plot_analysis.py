@@ -1,4 +1,4 @@
-import os, json
+import os, json, statistics
 import pandas as pd
 import numpy as np
 from scipy import stats
@@ -261,6 +261,7 @@ def plot_delta_distribution(folder,plot_folder,df_exps,sampling_algo="",absolute
 
     plt.savefig(folder+plot_folder+sampling_algo+"_deltaDistro.png", bbox_inches='tight')
 
+from scipy.interpolate import interp1d
 def plot_delta_distribution_aggr(folder,plot_folder,df_exps,sampling_algo="",absoluteScale=False):
     plt.rcParams.update({'font.size': 22})
     fig, axs = plt.subplots(4, 1)
@@ -278,6 +279,12 @@ def plot_delta_distribution_aggr(folder,plot_folder,df_exps,sampling_algo="",abs
     prev_imp_distro=[]
     prev_lik_distro=[]
     prev_sco_distro=[]
+
+    # yconvergence_len=[]
+    # yconvergence_imp=[]
+    # yconvergence_lik=[]
+    # yconvergence_sco=[]
+
     for sample, item in grouped_by_experiment:
 
         current_len_distro = list(item["length"])+prev_len_distro
@@ -296,6 +303,11 @@ def plot_delta_distribution_aggr(folder,plot_folder,df_exps,sampling_algo="",abs
             y_lik.append(res_lik.statistic)
             y_sco.append(res_sco.statistic)
 
+            # yconvergence_len.append(abs(y_len[len(y_len)-1])/abs(y_len[len(y_len)-2]))
+            # yconvergence_imp.append(abs(y_imp[len(y_imp)-1])/abs(y_imp[len(y_imp)-2]))
+            # yconvergence_lik.append(abs(y_lik[len(y_lik)-1])/abs(y_lik[len(y_lik)-2]))
+            # yconvergence_sco.append(abs(y_sco[len(y_sco)-1])/abs(y_sco[len(y_sco)-2]))
+
             x_iterations.append(sample)
 
         prev_len_distro=current_len_distro
@@ -305,6 +317,11 @@ def plot_delta_distribution_aggr(folder,plot_folder,df_exps,sampling_algo="",abs
         
         labels_legend.append(sample)
     
+    # print(statistics.mean(yconvergence_len))
+    # print(statistics.mean(yconvergence_imp))
+    # print(statistics.mean(yconvergence_lik))
+    # print(statistics.mean(yconvergence_sco))
+    # yy = [ x * min(yconvergence_len) for x in x_iterations ]
     axs[0].plot(x_iterations, y_len, linewidth = '2')
     axs[1].plot(x_iterations, y_imp, linewidth = '2')
     axs[2].plot(x_iterations, y_lik, linewidth = '2')
@@ -559,6 +576,18 @@ if __name__ == "__main__":
                         base_name = str(n)+'_'+str(v)+'_'+t+'_'+d+'_'+str(u)
                         folder_name = config.ROOT_FOLDER+base_name+"/"
                         
+                        if os.path.exists(folder_name+config.gt_paths): 
+                            GT_path_file = folder_name+config.gt_paths
+                            with open(GT_path_file) as f: gt_paths = json.load(f)
+                            count_query_paths=0
+                            for gtp in gt_paths:
+                                if isQuery(config.QUERY,gtp): count_query_paths+=1
+                        else:
+                            count_query_paths=None
+
+                        print(count_query_paths)
+                        exit()
+                        
                         for samplingType in os.listdir(folder_name):
                             if samplingType in config.sampling_algorithms:
                                 for exp in range(1,config.num_experiments+1):
@@ -566,14 +595,6 @@ if __name__ == "__main__":
                                         """
                                         SAMPLING
                                         """
-                                        if os.path.exists(folder_name+config.gt_paths): 
-                                            GT_path_file = folder_name+config.gt_paths
-                                            with open(GT_path_file) as f: gt_paths = json.load(f)
-                                            count_query_paths=0
-                                            for gtp in gt_paths:
-                                                if isQuery(config.QUERY,gtp): count_query_paths+=1
-                                        else:
-                                            count_query_paths=None
 
                                         filename_sample_other = folder_name+samplingType+\
                                                     "/exp"+str(exp)+config.get_samples_filename("none")
@@ -625,7 +646,7 @@ if __name__ == "__main__":
                             #     list_dfcut.append(d)
                             df_sampling_derivative = pd.concat(df_samples[k])
                             # plot_delta_distribution("",current_folder_plot,df_sampling_derivative,k)
-                            # plot_delta_distribution_aggr("",current_folder_plot,df_sampling_derivative,k)
+                            plot_delta_distribution_aggr("",current_folder_plot,df_sampling_derivative,k)
 
                             
                             # averages_samples = df_sampling_derivative.groupby(['iteration']).median().reset_index()
@@ -637,32 +658,32 @@ if __name__ == "__main__":
                             #     # plot_distance_boxplot("",df_samples[k],GT_path_file,k)
                             #     plot_distance_boxplot("",current_folder_plot,df_sampling_derivative,GT_path_file,k)
 
-                        for k in df_steers.keys():
-                            df_sampling = pd.concat(df_steers[k])
-                            # plot_by_query("",current_folder_plot,df_sampling)
+                        # for k in df_steers.keys():
+                        #     df_sampling = pd.concat(df_steers[k])
+                        #     # plot_by_query("",current_folder_plot,df_sampling)
 
-                            averages_stats = df_sampling.groupby(['iteration','num_samples','steering_type']).median().reset_index()
-                            averages_stats.to_csv(current_folder_plot+"/avg_stats.csv",index=False)
-                            # plot_time_steering("",current_folder_plot,averages_stats,"time_steering",k)
-                            # plot_time_steering("",current_folder_plot,averages_stats,"time_generation",k)
-                        max_iteration=int(max(list(df_sampling[df_sampling.steering_type == "steering"]["iteration"])))
+                        #     averages_stats = df_sampling.groupby(['iteration','num_samples','steering_type']).median().reset_index()
+                        #     averages_stats.to_csv(current_folder_plot+"/avg_stats.csv",index=False)
+                        #     # plot_time_steering("",current_folder_plot,averages_stats,"time_steering",k)
+                        #     # plot_time_steering("",current_folder_plot,averages_stats,"time_generation",k)
+                        # max_iteration=int(max(list(df_sampling[df_sampling.steering_type == "steering"]["iteration"])))
                         
-                        for k in df_steers.keys():
-                            list_df_extended = []
-                            for df_curr in df_steers[k]:
-                                curr_max_iteration = int(max(list(df_curr[df_curr.steering_type == "steering"]["iteration"])))
-                                copy_row = df_curr[(df_curr.steering_type == "steering") & (df_curr.iteration == curr_max_iteration)]
-                                for i in range(curr_max_iteration,max_iteration):
-                                    copy_row["iteration"] = i
-                                    df_curr = df_curr.append(copy_row, ignore_index=True)
-                                list_df_extended.append(df_curr)
-                            df_sampling = pd.concat(list_df_extended)
+                        # for k in df_steers.keys():
+                        #     list_df_extended = []
+                        #     for df_curr in df_steers[k]:
+                        #         curr_max_iteration = int(max(list(df_curr[df_curr.steering_type == "steering"]["iteration"])))
+                        #         copy_row = df_curr[(df_curr.steering_type == "steering") & (df_curr.iteration == curr_max_iteration)]
+                        #         for i in range(curr_max_iteration,max_iteration):
+                        #             copy_row["iteration"] = i
+                        #             df_curr = df_curr.append(copy_row, ignore_index=True)
+                        #         list_df_extended.append(df_curr)
+                        #     df_sampling = pd.concat(list_df_extended)
 
-                            count_query_paths=None
-                            # plot_lines_steering_all("",current_folder_plot,df_sampling,k,count_query_paths)
+                        #     count_query_paths=None
+                        #     # plot_lines_steering_all("",current_folder_plot,df_sampling,k,count_query_paths)
 
-                            averages_stats = df_sampling.groupby(['iteration','num_samples','steering_type']).median().reset_index()
-                            averages_stats.to_csv(current_folder_plot+"/avg_stats.csv",index=False)                        
-                            first_quantiles_stats = df_sampling.groupby(['iteration','num_samples','steering_type']).quantile(0.25).reset_index()
-                            third_quantiles_stats = df_sampling.groupby(['iteration','num_samples','steering_type']).quantile(0.75).reset_index()
-                            plot_lines_steering("",current_folder_plot,averages_stats,first_quantiles_stats,third_quantiles_stats,k,count_query_paths)
+                        #     averages_stats = df_sampling.groupby(['iteration','num_samples','steering_type']).median().reset_index()
+                        #     averages_stats.to_csv(current_folder_plot+"/avg_stats.csv",index=False)                        
+                        #     first_quantiles_stats = df_sampling.groupby(['iteration','num_samples','steering_type']).quantile(0.25).reset_index()
+                        #     third_quantiles_stats = df_sampling.groupby(['iteration','num_samples','steering_type']).quantile(0.75).reset_index()
+                        #     plot_lines_steering("",current_folder_plot,averages_stats,first_quantiles_stats,third_quantiles_stats,k,count_query_paths)

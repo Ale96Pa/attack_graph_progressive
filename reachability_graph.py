@@ -230,7 +230,7 @@ def clean_benchmark(folder):
         except NotADirectoryError:
             continue
         
-def build_dataset(clean_data=False):
+def build_dataset(clean_data=False, num_exps = config.num_experiments):
     if not os.path.exists(config.ROOT_FOLDER): os.makedirs(config.ROOT_FOLDER)
 
     if clean_data: clean_benchmark(config.ROOT_FOLDER)
@@ -259,7 +259,7 @@ def build_dataset(clean_data=False):
                             folder_name_sample=folder_name+sampling+"/"
                             if not os.path.exists(folder_name_sample): os.mkdir(folder_name_sample)
                             
-                            for exp in range(1,config.num_experiments+1):
+                            for exp in range(1,num_exps+1):
                                 experiment_folder = folder_name_sample+'exp'+str(exp)+"/"
                                 if not os.path.exists(experiment_folder): os.mkdir(experiment_folder)
                     

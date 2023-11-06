@@ -1,27 +1,45 @@
 import json, csv, itertools
 
+### SAMPLING parameters
+sampling_algorithms = ["random"]#,"random", "bfs","dfs"]
+num_samples = 100
+# steering_types = ["none","steering"]
+steering_types = ["steering"]
+
 ### BENCHMARK parameters
 num_cores = 3
-num_experiments = 3
+num_experiments = 1
 clean_dataset=True
 collision_end_value_query = 0.95
 collision_end_value_other = 0.85
-collision_control = 15 #number of tuples to consider for average collisions
+collision_control = 50*round(1500/num_samples) #number of tuples to consider for average collisions
 
-### SAMPLING parameters
-sampling_algorithms = ["random"]#,"random", "bfs","dfs"]
-num_samples = 50
-steering_types = ["none","steering"]
-# steering_types = ["steering"]
 
 ### STEERING parameters
 precision_control=1.3
-smoothing_window = 20
-decision_window = 15
+smoothing_window = 50*round(1500/num_samples)#20
+decision_window = 50*round(1500/num_samples)#15
 decision_num_restart = 0.25
 max_iteration_same_query = 1000
 
 ### QUERIES parameters
+sok_queries=[
+    {'id': "r1",
+    'impact': [3,5],
+    'likelihood': [5,8]},
+    {'id': "r2",
+    'impact': [3,5],
+    'likelihood': [5,8]},
+    {'id': "r3",
+    'impact': [3,5],
+    'likelihood': [5,8]},
+    {'id': "r4",
+    'impact': [3,5],
+    'likelihood': [5,8]},
+    {'id': "r5",
+    'impact': [3,5],
+    'likelihood': [5,8]},
+]
 QUERY={
     'id': "0",
     'impact': [3,5],
@@ -39,11 +57,11 @@ def all_combination_queries():
                 })
                 queries.append({
                 'id': "score:"+str(subset[0]),
-                "impact": subset[0]
+                "score": subset[0]
                 })
                 queries.append({
                 'id': "likelihood:"+str(subset[0]),
-                "impact": subset[0]
+                "likelihood": subset[0]
                 })
                 # print("impact:"+str(subset[0]))
             elif len(subset) == 2:
@@ -64,7 +82,7 @@ def all_combination_queries():
     return queries
 
 ### NETWORK SETTING parameters
-nhosts = [8]
+nhosts = [10]
 nvulns = [10]
 topologies = ["powerlaw"]#,"tree"] #mesh,random,star,ring,tree,powerlaw,lan0,lan25,lan50,
 distro = ["uniform"] #uniform,bernoulli,poisson,binomial
