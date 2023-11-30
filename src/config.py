@@ -26,8 +26,8 @@ smoothing_window = 50 # number of tuples to calculate median precision
 decision_window = 50 # number of tuples to calculate median iterations of precision breakdown
 
 ### NETWORK SETTING parameters
-nhosts = [5]
-nvulns = [5]
+nhosts = [10]
+nvulns = [10]
 topologies = ["powerlaw"] # other options: "mesh","random","star","ring","tree","powerlaw","lan0","lan25","lan50"
 distro = ["uniform"] # other options: "uniform","bernoulli","poisson","binomial"
 diversity = [1]

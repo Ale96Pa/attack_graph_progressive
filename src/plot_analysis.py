@@ -16,14 +16,14 @@ def get_name_steering_type(str_steer):
     if "none" in str_steer: return "StatAG"
     else: return "SteerAG"
 def plot_lines_steering(folder,plot_folder,df_experiments,mins_stats,max_stats,sampling_algo="",tot_paths=None):
-    plt.rcParams.update({'font.size': 24})
+    plt.rcParams.update({'font.size': 18})
     figrecall, axsrecall = plt.subplots()
-    figrecall.set_figwidth(15)
-    figrecall.set_figheight(10)
+    figrecall.set_figwidth(10)
+    figrecall.set_figheight(6)
 
     figprecision, axsprecision = plt.subplots()
-    figprecision.set_figwidth(15)
-    figprecision.set_figheight(10)
+    figprecision.set_figwidth(10)
+    figprecision.set_figheight(6)
 
     if "isSteering" in df_experiments.columns:
         index_steering = list(df_experiments[df_experiments.isSteering == True]["iteration"])
@@ -56,21 +56,21 @@ def plot_lines_steering(folder,plot_folder,df_experiments,mins_stats,max_stats,s
 
         labels_legend.append(get_name_steering_type(sample[0]))
         
-        axsrecall.plot(x_vals,y_vals_recall,linewidth = '2', label=get_name_steering_type(sample))
+        axsrecall.plot(x_vals,y_vals_recall,linewidth = '1', label=get_name_steering_type(sample))
         # axsrecall.fill_between(x_vals, y_mins, y_maxs, alpha=.5)
         
-        axsprecision.plot(x_vals,y_vals_precision,linewidth = '2', label=get_name_steering_type(sample))
+        axsprecision.plot(x_vals,y_vals_precision,linewidth = '1', label=get_name_steering_type(sample))
         # axsprecision.fill_between(x_vals, y_mins_prec, y_maxs_prec, alpha=.5)
         
     axsrecall.set_xlabel("iterations")
     axsrecall.set_ylabel("recall")
     # axsrecall.set_ylim(0,1)
-    axsrecall.legend()
+    # axsrecall.legend()
 
     axsprecision.set_xlabel("iterations")
     axsprecision.set_ylabel("precision")
     # axsprecision.set_ylim(0,1)
-    axsprecision.legend()
+    # axsprecision.legend()
 
     figrecall.savefig(folder+plot_folder+sampling_algo+"_recall_steering.png", bbox_inches='tight')
     figprecision.savefig(folder+plot_folder+sampling_algo+"_precision_steering.png", bbox_inches='tight')
@@ -560,7 +560,9 @@ if __name__ == "__main__":
                                         """
                                         SAMPLING
                                         """
-                                        steer_type="none"
+                                        if config.start_with_gt: steer_type="none"
+                                        else: steer_type="steering"
+                                        
                                         if not config.start_with_gt: steer_type="steering"
                                         filename_sample_other = folder_name+samplingType+\
                                                     "/exp"+str(exp)+config.get_samples_filename(steer_type)
@@ -593,7 +595,7 @@ if __name__ == "__main__":
                         """
                         PLOT FOR EACH EXPERIMENT
                         """
-                        current_folder_plot = config.plot_folder+"/"+base_name+"/"
+                        current_folder_plot = config.plot_folder+base_name+"/"
                         if not os.path.exists(current_folder_plot): os.makedirs(current_folder_plot)
 
                         for k in df_stats.keys():
