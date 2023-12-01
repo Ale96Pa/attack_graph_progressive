@@ -1,6 +1,16 @@
 # TODO TITLE
 
-Short description
+## Abstract
+
+In the current networks, where cyber attacks occur daily evolving even more sophisticated, a timely cyber risk assessment becomes paramount.
+We focus on the pervasive threat of multi-step attacks, particularly insidious for network security.
+Attack Graph (AG) represents the most suited solution to model and analyze these attacks, although they suffer from poor scalability due to the complexity of attack path analysis.
+
+To effectively monitor the exposure to multi-step attacks, we introduces a novel progressive analytics framework for AG generation and attack path analysis.
+First, it enables real-time attack path analysis before the completion of the AG generation process with a quantifiable approximation degree. This is achieved by leveraging the concept of statistical significance.
+Second, we further enhance the efficiency of attack path analysis by accelerating the AG generation based on specific analysis queries, prioritizing the computation of paths relevant to the analyst's needs. This is achieved through the design of a steering mechanism over the progressive framework.
+
+In this repository, you can find implementation choices, customized configuration files, and validation scenarios.
 
 ## Content
 
